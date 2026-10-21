@@ -69,6 +69,6 @@ export type GuidanceMode = 'friends' | 'pin';
 export interface LocalMembership {
   roomId: RoomId;
   participantId: ParticipantId;
-  /** サーバー検証用の秘密値。実際の認証方法は共有機能実装時に確定する。 */
+  /** サーバー検証用の秘密値。サーバーにはハッシュだけ保存する。 */
   resumeToken: string;
 }
