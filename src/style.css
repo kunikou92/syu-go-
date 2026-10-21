@@ -1,0 +1,32 @@
+:root { font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; color: #243d35; background: #f5f5ef; font-synthesis: none; line-height: 1.7; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+a { color: inherit; text-decoration: none; }
+.shell { max-width: 520px; margin: auto; padding: 28px 24px; }
+header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 48px; }
+.brand { font-size: 24px; font-weight: 900; letter-spacing: -.08em; }
+.brand span { display: block; font-size: 10px; letter-spacing: .2em; }
+.badge { border: 1px solid #c9d1c8; border-radius: 30px; padding: 4px 12px; font-size: 11px; }
+.eyebrow { font-size: 11px; letter-spacing: .23em; font-weight: bold; color: #537364; }
+h1 { font-size: clamp(28px, 7vw, 38px); line-height: 1.5; letter-spacing: -.05em; margin: 14px 0 20px; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+p { margin: 12px 0; }
+.lead { font-size: 14px; color: #58685f; line-height: 1.9; }
+.compass { width: 174px; height: 174px; border: 1px solid #cbd5c9; border-radius: 50%; margin: 32px auto; display: flex; align-items: center; justify-content: center; position: relative; background: #e8eddf; }
+.compass span { position: absolute; top: 10px; font-size: 11px; }
+.compass b { font-size: 90px; line-height: 1; font-weight: 400; }
+.button { display: flex; justify-content: space-between; align-items: center; min-height: 56px; padding: 14px 20px; background: #294f3e; color: white; border-radius: 14px; font-weight: bold; font-size: 14px; margin: 12px 0; }
+.button.secondary { background: transparent; color: #294f3e; border: 1px solid #acbdac; }
+.button:hover { filter: brightness(.94); }
+a:focus-visible { outline: 3px solid #b47b23; outline-offset: 4px; }
+main:focus { outline: none; }
+.hint, footer { font-size: 12px; color: #637065; }
+.card { padding: 24px; border: 1px solid #d5dccf; background: #fffef8; border-radius: 18px; margin: 24px 0; font-size: 14px; }
+dl { margin-bottom: 0; }
+dl div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #e5e8df; padding: 10px 0; }
+dd { margin: 0; }
+.empty-arrow { text-align: center; font-size: 64px; color: #a9b7a7; }
+.privacy { font-size: 13px; }
+footer { border-top: 1px solid #d5dccf; margin-top: 36px; padding-top: 16px; }
+footer a { display: inline-block; padding: 12px 0; text-decoration: underline; }
+@media (min-width: 700px) { .shell { padding-top: 40px; } }
