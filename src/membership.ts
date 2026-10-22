@@ -72,6 +72,9 @@ export function readSession(storage: Storage, scope: string, roomId: string): Se
 }
 
 export function writeSession(storage: Storage, scope: string, session: Session): void {
+  // 現在位置は画面のメモリーとサーバーの最新1件だけで扱う。
+  if (session.snapshot) session = { ...session, snapshot: { ...session.snapshot,
+    participant: { ...session.snapshot.participant, location: null } } };
   storage.setItem(sessionKey(scope, session.membership.roomId), JSON.stringify(session));
   if (!session.inactive) storage.setItem(`syu-go:${scope}:active-room`, session.membership.roomId);
 }
