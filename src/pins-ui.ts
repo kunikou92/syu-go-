@@ -87,7 +87,7 @@ export class PinsUI {
         <p class="hint">キーはこのブラウザーだけに保存し、地図の読み込み時にGoogleへ送信します。スマホではスマホ側にも設定してください。課金設定や有料キーへの切り替えは行いません。</p>
       </details>
       <form id="pin-form" novalidate><h3 id="pin-form-heading">${this.editing?'集合地点を変更':'集合地点を追加'}</h3>
-        <label for="pin-name">地点名</label><input id="pin-name" required value="${html(this.draft.name)}" aria-describedby="pin-form-help">
+        <label for="pin-name">地点名</label><input id="pin-name" required value="${html(this.draft.name)}" aria-describedby="pin-form-help pin-form-status">
         <p id="pin-form-help" class="hint">地図をタップして仮ピンを置き、地点名を入力して登録してください。位置を変えたい場合はタップし直すか仮ピンをドラッグできます。登録するまでルームには共有されません。</p>
         <button id="pin-map-open" class="button secondary" type="button">地図を開く・再試行</button>
         <p id="pin-map-status" class="hint" role="status"></p><button id="pin-map-reload" class="button secondary" type="button">画面を再読み込みする</button>
@@ -96,6 +96,8 @@ export class PinsUI {
         <details class="coordinate-details" ${savedDemoKey(localStorage)?'':'open'}><summary>座標を直接入力する</summary><div class="coordinate-inputs"><div><label for="pin-latitude">緯度</label><input id="pin-latitude" type="number" inputmode="decimal" step="any" min="-90" max="90" required value="${html(this.draft.latitude)}"></div>
         <div><label for="pin-longitude">経度</label><input id="pin-longitude" type="number" inputmode="decimal" step="any" min="-180" max="180" required value="${html(this.draft.longitude)}"></div></div><p class="hint">地図が使えないときは緯度・経度でも登録できます。</p></details>
         <button id="pin-save" class="button" type="submit">${this.editing?'変更を保存する':'集合地点を追加する'}</button>
+        <p id="pin-form-status" class="notice" role="status" tabindex="-1"></p>
+        <button id="pin-form-retry" class="button secondary" type="button" hidden>前回の操作結果を再確認する</button>
         <button id="pin-cancel-edit" class="button secondary" type="button" ${this.editing?'':'hidden'}>変更をやめる</button>
       </form><p class="hint">矢印と距離は直線での目安です。スマホを水平に持ってください。道路や障害物に沿った経路案内ではありません。</p></section>`;
   }
@@ -112,6 +114,7 @@ export class PinsUI {
     document.querySelector('#pin-compass')?.addEventListener('click',() => void this.compass.start());
     document.querySelector('#pin-form')?.addEventListener('submit',e => {e.preventDefault();void this.submit();});
     document.querySelector('#pin-retry')?.addEventListener('click',() => void this.save());
+    document.querySelector('#pin-form-retry')?.addEventListener('click',() => void this.save());
     document.querySelector('#pin-main')?.addEventListener('click',() => void this.prepare('main'));
     document.querySelector('#pin-edit')?.addEventListener('click',() => {const p=this.chosen();if(!p)return;this.editing={...p};this.draft={name:p.name,latitude:String(p.latitude),longitude:String(p.longitude)};this.redraw();});
     document.querySelector('#pin-delete')?.addEventListener('click',() => {this.deleting=this.chosen();this.paint();});
@@ -179,9 +182,11 @@ export class PinsUI {
     if(this.saving || this.pending || !this.session)return;
     this.captureDraft();
     try {
+      if(this.draft.name.trim() && (!this.draft.latitude.trim() || !this.draft.longitude.trim()))
+        throw new Error('場所が未選択です。地図をタップして仮ピンを置くか、「座標を直接入力する」で場所を指定してください。');
       const fields=pinFields(this.draft.name,this.draft.latitude,this.draft.longitude);
       await this.persist({action:this.editing?'update':'create',requestId:crypto.randomUUID(),pinId:this.editing?.id ?? crypto.randomUUID(),version:this.editing?.version,...fields});
-    }catch(error){this.message=(error as Error).message;this.paint();}
+    }catch(error){this.message=(error as Error).message;this.paint();document.querySelector<HTMLElement>('#pin-form-status')?.focus();}
   }
   private async prepare(action: 'delete' | 'main', target=this.chosen()): Promise<void> {
     if(!target || this.saving || this.pending)return;
@@ -214,8 +219,12 @@ export class PinsUI {
   paint(): void {
     const status=document.querySelector('#pins-status');if(!status)return;
     const disabled=!this.session || !this.ready || this.saving || !!this.pending;
-    text(status,!this.session?'ルームに参加すると集合地点を共有できます。':this.connectionError?'集合地点を更新できません。接続が戻り次第、再確認します。':this.message || (!this.ready?'集合地点を確認しています…':this.pins.length?'約5秒ごとに集合地点を更新しています。':'集合地点がありません。最初の地点を登録するとメインになります。'));
+    const message=!this.session?'ルームに参加すると集合地点を共有できます。':this.message || (this.connectionError?'集合地点を更新できません。接続が戻り次第、再確認します。':!this.ready?'集合地点を確認しています…':this.pins.length?'約5秒ごとに集合地点を更新しています。':'集合地点がありません。最初の地点を登録するとメインになります。');
+    text(status,message);
+    text(document.querySelector('#pin-form-status')!,!this.session || !this.ready || this.message || this.connectionError ? message : '地点名と場所を指定し、「集合地点を追加する」で登録してください。');
+    text(document.querySelector('#pin-save')!,this.saving?'保存結果を確認しています…':this.pending?'前回の操作結果を確認してください':this.editing?'変更を保存する':'集合地点を追加する');
     const retry=document.querySelector<HTMLButtonElement>('#pin-retry')!;retry.hidden=!this.pending;retry.disabled=this.saving;
+    const formRetry=document.querySelector<HTMLButtonElement>('#pin-form-retry')!;formRetry.hidden=!this.pending;formRetry.disabled=this.saving;
     const select=document.querySelector<HTMLSelectElement>('#pin-select')!;
     const options=this.pins.map(p => `<option value="${html(p.id)}">${html(p.name)}${p.id===this.mainId?'（メイン）':''}</option>`).join('');
     if(select.innerHTML!==options)select.innerHTML=options;

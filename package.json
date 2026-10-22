@@ -11,6 +11,7 @@
     "test:participants:live": "node --env-file=.env.local --experimental-strip-types scripts/check-participants-live.mjs",
     "test:location:live": "node --env-file=.env.local --experimental-strip-types scripts/check-location-live.mjs",
     "test:pins:live": "node --env-file=.env.local --experimental-strip-types scripts/check-pins-live.mjs",
+    "test:guidance:live": "node --env-file=.env.local --experimental-strip-types scripts/check-guidance-live.mjs",
     "build": "npm run check && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },

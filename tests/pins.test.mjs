@@ -124,6 +124,7 @@ test('応答消失・再読み込み後も同じ操作を再送して重複さ�
   const s=await create();let lost=false;const p=page(s,async(url,opts)=>{const r=await backend(url,opts);if(JSON.parse(opts.body).p_action==='create'&&!lost){lost=true;throw new Error('lost');}return r;});
   try{await until(()=>!p.button('pin-save').disabled);p.field('pin-name','再試行');p.field('pin-latitude','0');p.field('pin-longitude','0');submit(p);
     await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('未確定'));assert.equal((await call(s)).pins.length,1);
+    assert.match(p.w.document.querySelector('#pin-form-status').textContent,/未確定/);assert.equal(p.button('pin-form-retry').hidden,false);
     const saved={};for(let i=0;i<p.w.localStorage.length;i++){const k=p.w.localStorage.key(i);saved[k]=p.w.localStorage.getItem(k);}
     const q=page(s);try{for(const [k,v]of Object.entries(saved))q.w.localStorage.setItem(k,v);
       // 復帰時と同じく新しいUIを作成する。
@@ -131,6 +132,22 @@ test('応答消失・再読み込み後も同じ操作を再送して重複さ�
       await until(()=>!q.button('pin-retry').hidden);q.button('pin-retry').click();await until(()=>q.button('pin-retry').hidden);
       assert.equal((await call(s)).pins.length,1);
     }finally{q.w.close();}
+  }finally{p.w.close();}
+});
+
+test('登録ボタンの近くで未入力・場所未選択・保存結果を表示し、エラーへフォーカスする',async()=>{
+  const s=await create();let changes=0;
+  const p=page(s,(url,opts)=>{if(JSON.parse(opts.body).p_action!=='read')changes++;return backend(url,opts);});
+  try{
+    await until(()=>!p.button('pin-save').disabled);p.button('pin-save').click();
+    assert.match(p.w.document.querySelector('#pin-form-status').textContent,/地点名/);
+    assert.equal(p.w.document.activeElement.id,'pin-form-status');assert.equal(changes,0);
+    p.field('pin-name','広場');p.button('pin-save').click();
+    assert.match(p.w.document.querySelector('#pin-form-status').textContent,/場所が未選択.*地図をタップ/);assert.equal(changes,0);
+    p.field('pin-latitude','35');p.field('pin-longitude','139');p.button('pin-save').click();
+    assert.match(p.button('pin-save').textContent,/確認しています/);assert.equal(p.button('pin-save').disabled,true);
+    await until(()=>p.w.document.querySelector('#pin-form-status').textContent.includes('保存しました'));
+    assert.equal(changes,1);assert.equal((await call(s)).pins.length,1);
   }finally{p.w.close();}
 });
 test('自分の位置・ピンの同期が古い場合やルーム切替後は古い矢印を出さない',async()=>{
