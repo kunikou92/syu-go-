@@ -1,9 +1,12 @@
 import './style.css';
 import { ROOM_POLICY } from './domain';
-import { backendConfig, createRoom, invitationUrl, loadCreation, normalizeNickname, pendingCreation, saveCreation } from './rooms';
+import { backendConfig, createRoom, CreationExpiredError, invitationUrl, loadCreation, normalizeNickname, pendingCreation, saveCreation } from './rooms';
+import { RoomUI } from './room-ui';
+import { readSession } from './membership';
 
 const config = backendConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 let creating = false;
+const roomUI = new RoomUI(config, () => render());
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('表示先が見つかりません。');
@@ -57,12 +60,15 @@ function render() {
     ? `<p class="eyebrow">${view.label}</p><h1>${view.title}</h1>${view.body}`
     : `<p class="eyebrow">NOT FOUND</p><h1>ページが<br>見つかりません。</h1><a class="button" href="#/">ホームに戻る →</a>`;
   if (path === '/created') content = createdContent();
+  if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1>友達の待つ<br>ルームへ。</h1>${roomUI.joinContent()}`;
+  if (path === '/guide') content = `<p class="eyebrow">GUIDANCE</p><h1>さあ、<br>合流しよう。</h1>${roomUI.guideContent()}${views['/guide'].body}`;
   app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー<span>集合！</span></a><span class="badge">開発中</span></header>
     <main id="main" tabindex="-1">${content}</main>
-    <footer><p>開発中です。招待URLからの参加・位置共有は、これから追加します。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
+    <footer><p>開発中です。参加者一覧・位置共有・方向案内は、これから追加します。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
   document.title = `${path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
   document.querySelector<HTMLFormElement>('#create-form')?.addEventListener('submit', handleCreate);
   document.querySelector<HTMLButtonElement>('#copy-invite')?.addEventListener('click', copyInvitation);
+  roomUI.mount();
   const input = document.querySelector<HTMLInputElement>('#nickname');
   if (input && config) {
     try {
@@ -84,6 +90,10 @@ function createdContent(): string {
   let saved;
   try { saved = config && loadCreation(localStorage, config.url); } catch { saved = null; }
   if (!saved) return '<h1>作成結果を表示できません。</h1><p>同じブラウザーで、前回と同じ名前を使って再試行してください。</p><a class="button" href="#/create">ルーム作成へ</a>';
+  try {
+    const session = config && readSession(localStorage, config.url, saved.room.id);
+    if (session?.inactive || session?.pendingLeave) return '<h1>このルームの参加は終了しています。</h1><p>退出処理中の場合は通信の回復をお待ちください。</p><a class="button" href="#/guide">参加状態を確認する</a>';
+  } catch { /* 作成結果自体の読み込みができた場合は引き続き表示する。 */ }
   if (Date.parse(saved.room.expiresAt) <= Date.now() || saved.room.endedAt) {
     return '<h1>このルームの有効期限は終了しました。</h1><a class="button" href="#/create">新しいルームを作る</a>';
   }
@@ -95,8 +105,8 @@ function createdContent(): string {
       <input id="invite-url" type="text" readonly value="${escapeHtml(url)}">
       <button id="copy-invite" class="button" type="button">招待URLをコピー</button>
       <p id="copy-status" role="status" aria-live="polite"></p>
-      <p class="hint">有効期限：${escapeHtml(expires)}<br>URLを知っている人が参加できる予定です。共有先を確かめて送ってください。</p>
-    </section><p class="notice">招待URLからの参加機能は準備中です。</p>
+      <p class="hint">有効期限：${escapeHtml(expires)}<br>URLを知っている人が参加できます。共有先を確かめて送ってください。</p>
+    </section>
     <p class="privacy">位置公開：OFF</p><a class="button secondary" href="#/guide">案内画面へ <span aria-hidden="true">→</span></a>`;
 }
 
@@ -131,8 +141,10 @@ async function handleCreate(event: SubmitEvent): Promise<void> {
     const result = await createRoom(config, intent);
     try { saveCreation(localStorage, config.url, result, intent); }
     catch { throw new Error('作成結果をブラウザーに保存できません。同じ名前でもう一度お試しください。'); }
+    roomUI.created(result, intent.resumeToken);
     window.location.hash = '/created';
   } catch (error) {
+    if (error instanceof CreationExpiredError) localStorage.removeItem(`syu-go:${config.url}:pending-creation`);
     status.textContent = error instanceof Error ? error.message : 'ルームを作成できませんでした。再試行してください。';
   } finally {
     creating = false;

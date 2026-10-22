@@ -13,6 +13,7 @@ let bundle;
 before(async () => {
   await db.exec('create role anon; create role authenticated;');
   await db.exec(await readFile(new URL('../supabase/migrations/202610210001_create_room.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/202610220001_room_membership.sql', import.meta.url), 'utf8'));
   const result = await build({
     configFile: false, logLevel: 'silent',
     define: {
@@ -74,7 +75,7 @@ test('不正な入力と別の秘密値による再取得を拒否する', async
   await rpc(intent);
   await assert.rejects(rpc({ ...intent, resumeToken: 'b'.repeat(64) }));
   await db.query("update app_private.rooms set created_at=now()-interval '25 hours', expires_at=now()-interval '1 hour' where id=$1", [intent.roomId]);
-  await assert.rejects(rpc(intent));
+  assert.equal((await rpc(intent)).status, 'ended');
 });
 
 test('公開ロールは直接テーブルを読めず、作成RPCだけを実行できる', async () => {

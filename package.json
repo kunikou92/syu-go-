@@ -7,6 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:live": "node --env-file=.env.local --experimental-strip-types scripts/check-membership-live.mjs",
     "build": "npm run check && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },

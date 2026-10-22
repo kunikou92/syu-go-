@@ -10,6 +10,7 @@ export interface CreatedRoom {
 export interface SavedCreation extends CreatedRoom { membership: LocalMembership }
 
 export const NICKNAME_MAX_LENGTH = 20;
+export class CreationExpiredError extends Error {}
 
 export function normalizeNickname(value: string): string {
   const nickname = value.trim();
@@ -64,7 +65,10 @@ export async function createRoom(config: BackendConfig, intent: CreationIntent, 
   if (!response.ok) {
     throw new Error('ルームを作成できませんでした。接続設定を確認するか、時間をおいて再試行してください。');
   }
-  const result = await response.json() as CreatedRoom;
+  const result = await response.json() as CreatedRoom & { status?: string };
+  if (result.status === 'ended' || result.status === 'membership_expired') {
+    throw new CreationExpiredError('前回の参加は終了しています。もう一度ボタンを押すと、新しいルームを作成します。');
+  }
   if (result.room?.id !== intent.roomId || result.participant?.roomId !== intent.roomId ||
       result.invitation?.roomId !== intent.roomId || !/^[a-f0-9]{64}$/.test(result.invitation?.token ?? '') ||
       !result.participant?.id || !Number.isFinite(Date.parse(result.room.expiresAt))) {
