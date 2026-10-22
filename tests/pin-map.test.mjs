@@ -58,6 +58,15 @@ test('接続失敗は再試行でき、認証・上限のエラーは地図を�
     await p.picker.open('test-key');assert.match(p.picker.message(),/再読み込み/);
   }finally{p.dom.window.close();}
 });
+
+test('現在地中心の初期表示を既存の集合地点で上書きせず、次の仮ピンには追従する',async()=>{
+ const fake=sdk(),p=page(async()=>fake.api);try{
+  p.picker.update(state());p.picker.centerOn({lat:34.5,lng:135.5});await p.picker.open('test-key');
+  assert.equal(fake.views[0].options.center.lat,34.5);assert.equal(fake.views[0].pans.length,0);
+  p.picker.update({...state(),pins:[{...pin(),latitude:42}]});assert.equal(fake.views[0].pans.length,0);
+  p.picker.update({...state(),draft:{lat:36,lng:140}});assert.equal(fake.views[0].pans.at(-1).lat,36);
+ }finally{p.dom.window.close();}
+});
 test('Demo Keyの形式と保存を検査し、SDKの読み込みを1回にまとめてキー変更を拒否する',async()=>{
   const key='AIza'+'b'.repeat(35);assert.equal(demoKey(' '+key+' '),key);assert.throws(()=>demoKey(key+'&callback=bad'));
   assert.equal(savedDemoKey({getItem(){throw new Error('blocked');}}),'');

@@ -28,12 +28,8 @@ if (!app) throw new Error('表示先が見つかりません。');
 const views = {
   '/': {
     label: 'HOME',
-    title: 'みんなの「どこ？」を、<br>ひとつの方向へ。',
-    body: `<p class="lead">友達や集合場所の方向を確かめながら、<br>みんなで合流するためのアプリ。</p>
-      <div class="compass" aria-hidden="true"><span>N</span><b>↗</b></div>
-      <a class="button" href="#/create">ルームを作る <span>→</span></a>
-      <a class="button secondary" href="#/join">ルームに参加する <span>↗</span></a>
-      <p class="hint">招待URLを受け取ったら、そこから参加できます。</p>`,
+    title: '',
+    body: '<p class="lead home-description">友達や集合場所の方向と距離を確かめながら、みんなで合流するためのアプリです。ルームを作って招待URLを共有すれば、一緒に使えます。</p><a class="button home-create" href="#/create">ルームを作る <span aria-hidden="true">→</span></a>',
   },
   '/create': {
     label: 'CREATE ROOM',
@@ -59,7 +55,7 @@ const views = {
   },
   '/guide': {
     label: 'GUIDANCE',
-    title: 'さあ、<br>合流しよう。',
+    title: '',
     body: '',
   },
 } as const;
@@ -72,14 +68,16 @@ function render() {
   let content = view
     ? `<p class="eyebrow">${view.label}</p><h1>${view.title}</h1>${view.body}`
     : `<p class="eyebrow">NOT FOUND</p><h1>ページが<br>見つかりません。</h1><a class="button" href="#/">ホームに戻る →</a>`;
-  if (path === '/created') content = createdContent() + participantsUI.content() + locationUI.content();
-  if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1>友達の待つ<br>ルームへ。</h1>${roomUI.joinContent()}`;
-  if (path === '/guide') content = `<p class="eyebrow">GUIDANCE</p><h1>さあ、<br>合流しよう。</h1>${roomUI.guideContent()}
+  if (path === '/') content = views['/'].body;
+  if (path === '/created') content = createdContent();
+  if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1 class="join-title">友達の待つルームへ。</h1>${roomUI.joinContent()}`;
+  if (path === '/guide') content = `${mode==='friends'?locationUI.content():''}
     <div class="mode-switch" role="group" aria-label="案内モード"><button id="mode-friends" class="button secondary" type="button" aria-pressed="${mode==='friends'}">友達モード</button><button id="mode-pins" class="button secondary" type="button" aria-pressed="${mode==='pin'}">ピンモード</button></div>
-    ${compassUI.content()}${mode==='friends'?friendsUI.content():pinsUI.content()}${locationUI.content()}${participantsUI.content()}`;
-  app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー<span>集合！</span></a><span class="badge">開発中</span></header>
+    ${mode==='friends'?friendsUI.content(compassUI.content()):pinsUI.content(compassUI.content())}${mode==='pin'?locationUI.content():''}${participantsUI.content()}${roomUI.guideContent()}`;
+  const simple = path === '/' || path === '/created';
+  app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー</a>${simple?'':'<span class="badge">開発中</span>'}</header>
     <main id="main" tabindex="-1">${content}</main>
-    <footer><p>開発中です。方向と距離は目安としてお使いください。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
+    ${simple?'':`<footer><p>開発中です。方向と距離は目安としてお使いください。</p><a href="#/">← ホームに戻る</a></footer>`}</div>`;
   document.title = `${path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
   document.querySelector<HTMLFormElement>('#create-form')?.addEventListener('submit', handleCreate);
   document.querySelector<HTMLButtonElement>('#copy-invite')?.addEventListener('click', copyInvitation);
@@ -89,7 +87,7 @@ function render() {
   friendsUI.mount();
   compassUI.mount();
   if(mode==='pin')pinsUI.mount();
-  document.querySelector('#mode-friends')?.addEventListener('click',() => {mode='friends';render();});
+  document.querySelector('#mode-friends')?.addEventListener('click',() => {pinsUI.leave();mode='friends';render();});
   document.querySelector('#mode-pins')?.addEventListener('click',() => {if(mode!=='pin')pinsUI.enter();mode='pin';render();});
   const input = document.querySelector<HTMLInputElement>('#nickname');
   if (input && config) {
@@ -121,9 +119,7 @@ function createdContent(): string {
   }
   const url = invitationUrl(window.location.href, saved.invitation);
   const expires = new Date(saved.room.expiresAt).toLocaleString('ja-JP');
-  return `<p class="eyebrow">ROOM CREATED</p><h1>ルームが<br>できました。</h1>
-    <p class="lead">${escapeHtml(saved.participant.nickname)}さんを作成者として登録しました。</p>
-    <section class="card"><h2>友達への招待URL</h2><label class="hint" for="invite-url">URLをコピーして共有できます。</label>
+  return `<section class="card"><h2>友達への招待URL</h2><label class="hint" for="invite-url">URLをコピーして共有できます。</label>
       <input id="invite-url" type="text" readonly value="${escapeHtml(url)}">
       <button id="copy-invite" class="button" type="button">招待URLをコピー</button>
       <p id="copy-status" role="status" aria-live="polite"></p>

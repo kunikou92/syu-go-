@@ -144,6 +144,9 @@ test('画面で入力検査、二重送信防止、作成結果の復元、コ�
     finish();
     await until(() => dom.window.document.querySelector('#invite-url'));
     assert.equal(dom.window.document.querySelectorAll('img').length, 0);
+    assert.equal(dom.window.document.querySelector('#location-controls'), null);
+    assert.equal(dom.window.document.querySelector('#participants-list'), null);
+    assert.equal(dom.window.document.querySelector('#mode-friends'), null);
     let copied;
     Object.defineProperty(dom.window.navigator, 'clipboard', { value: { writeText: async (value) => { copied = value; } } });
     dom.window.document.querySelector('#copy-invite').click();
@@ -156,6 +159,11 @@ test('画面で入力検査、二重送信防止、作成結果の復元、コ�
       restored.window.document.querySelector('#copy-invite').click();
       await until(() => restored.window.document.querySelector('#copy-status').textContent.includes('自動コピーが使えません'));
       assert.equal(restored.window.document.querySelector('#invite-url').selectionEnd, copied.length);
+      restored.window.location.hash = '/guide';
+      await until(() => restored.window.document.querySelector('#mode-friends'));
+      assert.ok(restored.window.document.querySelector('#location-controls'));
+      assert.ok(restored.window.document.querySelector('#heading-manual'));
+      assert.doesNotMatch(restored.window.document.querySelector('#main').textContent, /合流しよう/);
     } finally { restored.window.close(); }
   } finally { dom.window.close(); }
 });

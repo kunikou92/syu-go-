@@ -6,11 +6,10 @@ export class CompassUI {
     window.setInterval(() => this.paint(), 250);
   }
   content(): string {
-    return `<section class="card heading-settings" aria-labelledby="heading-title">
-      <h2 id="heading-title">画面の上は、どっち向き？</h2>
-      <p class="hint">コンパスが使えない・方向がずれる場合は、手動で指定できます。友達モードとピンモードの両方に反映します。</p>
-      <button id="heading-manual" class="button secondary" type="button">手動で方角を調整する</button>
+    return `<div class="heading-settings">
+      <button id="heading-manual" class="button secondary" type="button" aria-controls="heading-adjustment" aria-expanded="false">手動で方角を調整する</button>
       <div id="heading-adjustment" hidden>
+        <p class="hint">コンパスが使えない・方向がずれる場合は、手動で指定できます。友達モードとピンモードの両方に反映します。</p>
         <p id="heading-help" class="hint">地図や目印で方角を確かめ、画面の上が向いている方角を選んでください。0°は北、90°は東、180°は南、270°は西です。スマホを向け直したら再調整してください。</p>
         <div class="heading-presets" role="group" aria-label="画面の上が向いている方角">
           ${[['北',0],['東',90],['南',180],['西',270]].map(([name,angle]) => `<button class="button secondary" type="button" data-heading="${angle}">${name}</button>`).join('')}
@@ -19,9 +18,9 @@ export class CompassUI {
         <input id="heading-angle" type="range" min="0" max="359" step="1" value="0" aria-describedby="heading-help">
         <div class="heading-steps"><button id="heading-left" class="button secondary" type="button">−15°</button><button id="heading-right" class="button secondary" type="button">＋15°</button></div>
         <button id="heading-auto" class="button" type="button">自動取得に戻す</button>
+        <p id="heading-status" class="hint" role="status"></p>
       </div>
-      <p id="heading-status" class="hint" role="status"></p>
-    </section>`;
+    </div>`;
   }
   mount(): void {
     document.querySelector('#heading-manual')?.addEventListener('click', () => this.compass.useManual());
@@ -37,6 +36,7 @@ export class CompassUI {
     const manual = this.compass.isManual(), heading = this.compass.heading();
     (root as HTMLElement).hidden = !manual;
     (document.querySelector('#heading-manual') as HTMLButtonElement).hidden = manual;
+    document.querySelector('#heading-manual')!.setAttribute('aria-expanded', String(manual));
     const status = document.querySelector('#heading-status')!;
     const message = this.compass.status(); if (status.textContent !== message) status.textContent = message;
     const output = document.querySelector('#heading-value')!;

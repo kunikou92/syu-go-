@@ -25,7 +25,7 @@ function page(permission=async()=>'granted'){
   const compass=new w.ManualTest.Compass(()=>{controls.paint();friends.paint();pins.paint();});
   const controls=new w.ManualTest.CompassUI(compass),friends=new w.ManualTest.FriendsUI(()=>source,compass);
   const pins=new w.ManualTest.PinsUI(config,()=>source,()=>render(),compass);
-  function render(){w.document.querySelector('#app').innerHTML=controls.content()+(mode==='friends'?friends.content():pins.content());controls.mount();if(mode==='friends')friends.mount();else pins.mount();}
+  function render(){w.document.querySelector('#app').innerHTML=mode==='friends'?friends.content(controls.content()):pins.content(controls.content());controls.mount();if(mode==='friends')friends.mount();else pins.mount();}
   render();
   const sensor=()=>{const e=new w.Event('deviceorientationabsolute');Object.assign(e,{absolute:true,alpha:180,beta:0,gamma:0});w.dispatchEvent(e);};
   return {w,compass,source,render,sensor,calls:()=>calls,click:id=>w.document.getElementById(id).click(),mode:async m=>{mode=m;render();await tick();},advance:ms=>{time+=ms;timers.forEach(fn=>fn());}};

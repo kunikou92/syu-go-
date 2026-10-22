@@ -44,13 +44,13 @@ try{
   b.click('location-stop');await until(()=>!a.w.document.querySelector('.friend-row-arrow'),'OFFの他画面反映');assert.equal(a.w.document.querySelector('.friend-distance'),null);ok('公開OFFで他画面の矢印・距離を削除');
   await until(()=>!b.get('location-start').disabled,'再開準備');b.click('location-start');await until(()=>a.w.document.querySelector('.friend-row-arrow'),'公開再開');
   b.state.paused=true;await until(()=>!a.w.document.querySelector('.friend-row-arrow'),'30秒無更新で矢印削除',45000);b.state.paused=false;await until(()=>a.w.document.querySelector('.friend-row-arrow'),'位置更新の復帰');ok('位置取得停止→30秒後の非表示→更新再開');
-  a.click('mode-pins');await until(()=>!a.get('pin-save').disabled,'ピン準備');a.click('pin-save');assert.match(a.get('pin-form-status').textContent,/地点名/);
+  a.click('mode-pins');await until(()=>!a.get('pin-save').disabled,'ピン準備');a.click('pin-save');assert.match(a.get('pin-form-status').textContent,/場所が未選択/);
   a.field('pin-name','人工地点1');a.click('pin-save');assert.match(a.get('pin-form-status').textContent,/場所が未選択/);
   a.field('pin-latitude','.001');a.field('pin-longitude','0');a.click('pin-save');await until(()=>a.get('pin-form-status').textContent.includes('保存しました'),'ピン保存');
   assert.ok(a.w.document.querySelector('.pin-direction'));assert.match(a.get('heading-status').textContent,/手動調整中/);
-  b.click('mode-pins');await until(()=>b.get('pin-select').options.length===1,'ピン共有');ok('登録時の未入力案内・登録成功をボタン付近に表示、ピンを相互同期');
-  a.field('pin-name','人工地点2');a.field('pin-latitude','0');a.field('pin-longitude','.002');a.click('pin-save');await until(()=>a.get('pin-select').options.length===2,'2地点目');
-  const main=(await pinAction(config,owner)).mainPinId;assert.notEqual(a.get('pin-select').value,main);a.click('mode-friends');a.click('mode-pins');assert.equal(a.get('pin-select').value,main);ok('ピン選択と入り直した際のメイン初期選択、手動設定の保持');
+  b.click('mode-pins');await until(()=>b.get('pin-guidance').textContent.includes('人工地点1'),'ピン共有');ok('場所未選択の案内・登録成功をボタン付近に表示、ピンを相互同期');
+  const first=(await pinAction(config,owner)).pins[0];a.field('pin-name','人工地点2');a.field('pin-latitude','0');a.field('pin-longitude','.002');a.click('pin-save');await until(()=>a.get('pin-guidance').textContent.includes('人工地点2'),'同じピンの更新');
+  const updated=await pinAction(config,owner);assert.equal(updated.pins.length,1);assert.equal(updated.pins[0].id,first.id);a.click('mode-friends');a.click('mode-pins');assert.match(a.get('pin-guidance').textContent,/人工地点2/);ok('ピンを増やさず同じ地点を更新、モード切替後の地点と手動設定の保持');
   b.state.offline=true;b.w.dispatchEvent(new b.w.Event('online'));await until(()=>/確認できません|送信できません/.test(b.get('location-status').textContent),'通信中断の案内');
   b.state.offline=false;b.w.dispatchEvent(new b.w.Event('online'));await until(()=>b.get('location-status').textContent.includes('共有しています')&&b.w.document.querySelector('.pin-direction'),'通信復帰');ok('通信中断の案内と接続回復後の案内再開');
   a.click('heading-auto');await until(()=>a.get('heading-manual')&&!a.get('heading-manual').hidden,'自動復帰');assert.equal(a.w.document.querySelector('.pin-direction'),null);ok('自動復帰時は古い手動値の矢印を消してセンサー待ち');

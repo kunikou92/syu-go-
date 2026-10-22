@@ -103,16 +103,20 @@ function page(s,request=fetcher){
   const ui=new w.LocationTest.LocationUI(config);function render(){w.document.querySelector('#app').innerHTML=ui.content();ui.mount();}render();
   return {dom,w,timers,fixes,store,render,advance:(n)=>{elapsed+=n;},button:(id)=>w.document.querySelector('#location-'+id)};
 }
-async function until(fn){for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('画面更新タイムアウト');}
+async function until(fn){for(let i=0;i<300;i++){if(await fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('画面更新タイムアウト');}
 const fix=(f,lat=35)=>f.ok({coords:{latitude:lat,longitude:139,accuracy:12},timestamp:Date.now()});
 
 test('ONで初めて許可・取得し、5秒の更新と現在位置・精度・取得時刻、OFFで停止する',async()=>{
   const s=await create('<b>名前</b>');const p=page(s);
   try{await until(()=>!p.button('start').disabled);assert.equal(p.fixes.length,0);assert.equal(p.w.document.querySelector('b'),null);
     p.button('start').click();await until(()=>p.fixes.length===1);assert.equal(p.fixes[0].opts.maximumAge,0);fix(p.fixes[0]);
-    await until(()=>p.w.document.querySelector('#my-location').textContent.includes('緯度 35'));
+    await until(()=>p.w.document.querySelector('#my-location').textContent.includes('位置を更新しました'));
+    assert.equal(member(await rpc(s),s).location.latitude,35);
+    assert.doesNotMatch(p.w.document.querySelector('#my-location').textContent,/緯度|経度/);
+    assert.equal(p.w.document.querySelector('.location-details').open,false);
     await p.timers.get(5000)();await until(()=>p.fixes.length===2);fix(p.fixes[1],36);
-    await until(()=>p.w.document.querySelector('#my-location').textContent.includes('緯度 36'));
+    await until(async()=>member(await rpc(s),s).location.latitude===36);
+    assert.equal(p.button('start').getAttribute('aria-pressed'),'true');
     p.button('stop').click();await until(()=>p.w.document.querySelector('#location-status').textContent.includes('削除しました'));
     assert.equal(member(await rpc(s),s).location,null);await p.timers.get(5000)();assert.equal(p.fixes.length,2);
   }finally{p.w.close();}
@@ -154,7 +158,7 @@ test('通信が止まっても古い共有位置は端末側で30秒後に案内
 });
 test('再読み込み時に位置は自動取得せず、参加情報に座標を保存しない',async()=>{
   const s=await create();await rpc(s,'enable',0);const p=page(s);
-  try{await until(()=>p.button('start').textContent.includes('再開'));assert.equal(p.fixes.length,0);
+  try{await until(()=>p.button('start').getAttribute('aria-label')?.includes('再開'));assert.equal(p.fixes.length,0);
     writeSession(p.w.localStorage,config.url,{...s,snapshot:{...s.snapshot,participant:{...s.snapshot.participant,location:sample()}}});
     assert.equal(JSON.parse(p.w.localStorage.getItem(`syu-go:${config.url}:membership:${s.membership.roomId}`)).snapshot.participant.location,null);
   }finally{p.w.close();}

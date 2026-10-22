@@ -77,13 +77,15 @@ export class LocationUI {
   content(): string {
     this.syncScope();
     return `<section class="card" aria-labelledby="location-heading"><h2 id="location-heading">位置の共有</h2>
-      <p>公開すると、現在位置をこのルームの参加者に共有します。約5秒ごとに更新し、移動履歴は保存しません。</p>
+      <div id="location-controls" role="group" aria-label="位置公開の切り替え"><button id="location-start" class="button secondary" type="button" aria-pressed="false">ON</button>
+      <button id="location-stop" class="button secondary" type="button" aria-pressed="true">OFF</button></div>
+      <p id="location-status" role="status"></p>
+      <details class="location-details"><summary>位置情報についての注意</summary>
+      <p class="hint">ONにすると、現在位置をこのルームの参加者に共有します。約5秒ごとに更新し、移動履歴は保存しません。</p>
       <p class="hint">OFFにすると取得・送信を停止し、共有済みの位置を削除します。通信できない間は削除が未確定です。30秒更新されない位置は案内に使いません。</p>
-      <div id="location-controls"><button id="location-start" class="button" type="button">位置公開をONにする</button>
-      <button id="location-stop" class="button secondary" type="button">位置公開をOFFにする</button></div>
-      <p id="location-status" role="status"></p><p id="my-location" class="hint"></p>
+      <p id="my-location" class="hint"></p>
       <ul id="location-members" class="participants-list" aria-label="位置の共有状況"></ul>
-      <p class="hint">画面を閉じている間や背景での更新は保証されません。案内画面の友達モードで方向と距離を確認できます。</p></section>`;
+      <p class="hint">画面を閉じている間や背景での更新は保証されません。案内画面の友達モードで方向と距離を確認できます。</p></details></section>`;
   }
   guidance(): FriendSource | null {
     this.syncScope();
@@ -229,12 +231,16 @@ export class LocationUI {
     const list = document.querySelector<HTMLElement>('#location-members')!;
     const elapsed = performance.now() - this.receivedAt;
     start.disabled = !this.session || !this.ready || this.running || this.enabling || this.pending.has(key(this.session));
-    start.textContent = this.sharing && !this.running ? '位置公開を再開する' : '位置公開をONにする';
+    start.textContent = 'ON';
+    start.setAttribute('aria-label',this.sharing && !this.running?'位置公開を再開する':'位置公開をONにする');
+    stop.setAttribute('aria-label','位置公開をOFFにする');
+    start.setAttribute('aria-pressed',String(this.running && this.sharing));
+    stop.setAttribute('aria-pressed',String(!this.sharing && !this.enabling && !this.pending.has(key(this.session))));
     stop.disabled = !this.session || (!this.sharing && !this.running && !this.enabling && !this.pending.has(key(this.session)));
     status.textContent = !this.session ? 'ルームに参加すると位置を共有できます。' : this.message ||
       (!this.ready ? '共有設定を確認しています…' : this.sharing ? '位置公開ONです。再開ボタンを押すまで、この画面では位置を取得しません。' : '位置公開OFFです。位置は取得・送信しません。');
     mine.textContent = this.running && locationFresh(this.lastFix, this.serverTime, elapsed)
-      ? `現在位置：緯度 ${this.lastFix!.latitude.toFixed(5)}／経度 ${this.lastFix!.longitude.toFixed(5)}　精度 約${Math.round(this.lastFix!.accuracyMeters!)}m　取得 ${new Date(this.lastFix!.updatedAt).toLocaleTimeString('ja-JP')}` : '';
+      ? `位置を更新しました。精度 約${Math.round(this.lastFix!.accuracyMeters!)}m　取得 ${new Date(this.lastFix!.updatedAt).toLocaleTimeString('ja-JP')}` : '';
     const markup = this.members.map((p) => `<li class="participant-row"><p class="participant-name">${html(p.nickname)}</p><p class="hint">${!p.locationSharing ? '位置非公開' : locationFresh(p.location, this.serverTime, elapsed) ? '位置を共有中' : '新しい位置を待っています（案内対象外）'}</p></li>`).join('');
     if (list.innerHTML !== markup) list.innerHTML = markup;
   }

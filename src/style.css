@@ -4,11 +4,20 @@ body { margin: 0; }
 a { color: inherit; text-decoration: none; }
 .shell { max-width: 520px; margin: auto; padding: 28px 24px; }
 header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 48px; }
-.brand { font-size: 24px; font-weight: 900; letter-spacing: -.08em; }
-.brand span { display: block; font-size: 10px; letter-spacing: .2em; }
+.brand { font-size: 34px; font-weight: 900; letter-spacing: -.08em; }
+.home-create { margin-top: 12px; }
+#location-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+#location-controls .button { justify-content: center; margin: 8px 0; font-size: 17px; }
+#location-controls [aria-pressed="true"] { background: #294f3e; color: #fff; opacity: 1; }
+.location-details { margin-top: 18px; border-top: 1px solid #d5dccf; padding-top: 14px; }
 .badge { border: 1px solid #c9d1c8; border-radius: 30px; padding: 4px 12px; font-size: 11px; }
 .eyebrow { font-size: 11px; letter-spacing: .23em; font-weight: bold; color: #537364; }
 h1 { font-size: clamp(28px, 7vw, 38px); line-height: 1.5; letter-spacing: -.05em; margin: 14px 0 20px; }
+.join-title { font-size: clamp(20px, 5.8vw, 30px); white-space: nowrap; }
+.button.secondary.leave-button { border: 1px solid #c1534b; color: #a33d35; font-weight: 400; }
+.pin-map-card { padding: 16px; }
+.pin-create-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.pin-create-actions .button { justify-content: center; padding: 12px 6px; font-size: 13px; }
 h2 { font-size: 17px; margin: 0 0 12px; }
 p { margin: 12px 0; }
 .lead { font-size: 14px; color: #58685f; line-height: 1.9; }

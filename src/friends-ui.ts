@@ -16,13 +16,14 @@ export class FriendsUI {
     this.compass = compass ?? new Compass(() => this.paint());
     window.setInterval(() => this.paint(), 250);
   }
-  content(): string {
-    return `<section class="card friends-card" aria-labelledby="friends-heading"><p class="eyebrow">FRIENDS</p>
-      <h2 id="friends-heading">友達は、どっち？</h2><p class="hint">スマホを水平に持ってください。矢印は直線方向、距離は直線距離の目安です。</p>
+  content(headingControls = ''): string {
+    return `<section class="card friends-card" aria-label="友達の案内">
+      <p class="hint">スマホを水平に持ってください。矢印は直線方向、距離は直線距離の目安です。</p>
       <button id="compass-start" class="button secondary" type="button">コンパスを有効にする・再試行</button>
       <p id="compass-status" class="hint" role="status"></p><p id="friends-status" role="status"></p>
       <div id="friends-radar" class="friends-radar" aria-hidden="true" hidden></div>
       <ol id="friends-list" class="friends-list" aria-label="友達の方向と距離"></ol>
+      ${headingControls}
       <p class="hint">番号は下の名前に対応します。重なる番号をずらしても、矢印が指す向きは変わりません。道路や障害物に沿った経路案内ではありません。</p></section>`;
   }
   mount(): void {
@@ -54,8 +55,7 @@ export class FriendsUI {
     const markup = friends.map((p, i) => {
       const angle = heading !== null && p.bearing !== null ? degrees(p.bearing - heading) : null;
       return `<li class="friend-row"><span class="friend-number">${i + 1}</span><div><p class="participant-name">${html(p.nickname)}</p><p class="friend-distance">${distanceLabel(p.distance)}</p>
-        <p class="hint">${p.bearing === null ? p.distance < 1 ? 'すぐ近くです。方角は表示しません。' : '方角を確定できません。' : angle === null ? '方角の取得待ち' : `画面の上から時計回りに約${Math.round(angle) % 360}°`}
-        ${p.distance < (own!.accuracyMeters ?? 0) + (p.location!.accuracyMeters ?? 0) ? ' 位置の誤差が距離より大きい可能性があります。' : ''}</p></div>
+        <p class="hint">位置や方角には誤差があります。${p.distance < (own!.accuracyMeters ?? 0) + (p.location!.accuracyMeters ?? 0) ? ' 位置の誤差が距離より大きい可能性があります。' : ''}</p></div>
         ${angle === null ? '' : `<span class="friend-row-arrow" role="img" aria-label="${html(p.nickname)}の方向：画面の上から時計回りに約${Math.round(angle) % 360}度" style="transform:rotate(${angle.toFixed(2)}deg)">↑</span>`}</li>`;
     }).join('');
     if (list.innerHTML !== markup) list.innerHTML = markup;

@@ -1,6 +1,5 @@
 import type { BackendConfig, CreatedRoom } from './rooms';
 import type { RoomInvitation } from './domain';
-import { invitationUrl } from './rooms';
 import { acceptReply, activeSession, parseInvitation, pendingDepartures, prepareJoin, readSession, requestLeave,
   roomAction, statusMessages, writeSession } from './membership';
 import type { RoomReply, RoomStatus, Session } from './membership';
@@ -90,8 +89,7 @@ export class RoomUI {
     return `<section class="card"><h2>${html(session.nickname)}さんのルーム</h2>
       <p id="connection-status" role="status">${html(session.pendingLeave ? '退出を送信しています。通信が戻り次第、退出を確定します。' : this.connection)}</p>
       <p class="hint">通信が5分間途絶えると自動退出します。画面を閉じるだけでは即退出になりません。</p>
-      <a href="${html(invitationUrl(window.location.href, session.snapshot.invitation))}">このルームの招待画面</a>
-      <button id="leave-room" class="button secondary" type="button" ${session.pendingLeave ? 'disabled' : ''}>ルームから退出する</button></section>`;
+      <button id="leave-room" class="button secondary leave-button" type="button" ${session.pendingLeave ? 'disabled' : ''}>ルームから退出する</button></section>`;
   }
 
   mount(): void {

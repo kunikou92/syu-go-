@@ -91,7 +91,7 @@ test('同じ位置では不定の矢印を表示せず、名前・距離・位�
   const d=data();d.members[1].location=loc(0,0);const p=page(d);try{
     p.w.document.querySelector('#compass-start').click();await settle();p.sensor(0);
     assert.equal(p.w.document.querySelectorAll('.friend-row-arrow').length,0);
-    assert.match(p.w.document.querySelector('#friends-list').textContent,/すぐ近く/);
+    assert.doesNotMatch(p.w.document.querySelector('#friends-list').textContent,/画面の上から時計回り/);
     assert.match(p.w.document.querySelector('#friends-list').textContent,/誤差/);
   }finally{p.w.close();}
 });

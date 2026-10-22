@@ -18,6 +18,7 @@ export class PinMap {
   private loaded = false;
   private key = '';
   private focused = '';
+  private center: MapPoint | null = null;
   private mapListener: MapListener | null = null;
   constructor(private picked: (point: MapPoint, scope: string) => void,
     private selected: (id: string, scope: string) => void, private changed: () => void,
@@ -37,8 +38,15 @@ export class PinMap {
   }
   available(): boolean {return this.loaded && !this.error;}
   busy(): boolean {return this.loading;}
+  centerOn(point: MapPoint): void {
+    if(!validPoint(point))return;
+    this.center=point;
+    const pin=this.state.pins.find(p=>p.id===this.state.selected);
+    this.focused=JSON.stringify([this.state.scope,this.state.draft ?? (pin?{lat:pin.latitude,lng:pin.longitude}:null)]);
+    this.map?.panTo(point);
+  }
   message(): string {
-    return this.error || (this.loading ? '地図を読み込んでいます…' : this.loaded ? '地図をタップして仮のピンを置き、地点名を入力して登録してください。仮のピンはドラッグでも調整できます。' : '「地図を開く」でGoogleマップから場所を選べます。');
+    return this.error || (this.loading ? '地図を読み込んでいます…' : this.loaded ? '地図をタップして場所を選んでください。仮ピンはドラッグでも調整できます。' : '地図の準備をしています。');
   }
   private point(event: MapClick, fallback?: MapPoint | null): void {
     const point = event.latLng ? {lat:event.latLng.lat(),lng:event.latLng.lng()} : fallback;
@@ -55,9 +63,10 @@ export class PinMap {
       if(!this.map) {
         this.sdk = sdk;this.key = key;
         const pin=this.state.pins.find(p=>p.id===this.state.selected);
-        const center=this.state.draft ?? (pin?{lat:pin.latitude,lng:pin.longitude}:{lat:35.681236,lng:139.767125});
+        const center=this.center ?? this.state.draft ?? (pin?{lat:pin.latitude,lng:pin.longitude}:{lat:35.681236,lng:139.767125});
         this.map = new sdk.Map(this.host,{center,zoom:15,mapId:'DEMO_MAP_ID',mapTypeControl:false,streetViewControl:false,
           fullscreenControl:true,gestureHandling:'cooperative',clickableIcons:false,keyboardShortcuts:true});
+        if(this.center)this.focused=JSON.stringify([this.state.scope,this.state.draft??(pin?{lat:pin.latitude,lng:pin.longitude}:null)]);
         this.mapListener = this.map.addListener('click',event => this.point(event));
         this.draftMarker = new sdk.marker.AdvancedMarkerElement({map:null,title:'仮のピン（未登録）',gmpDraggable:true});
         const label=document.createElement('span');label.className='draft-map-pin';label.textContent='仮';this.draftMarker.append(label);
@@ -68,7 +77,7 @@ export class PinMap {
     finally {if(attempt===this.attempt){this.loading=false;this.changed();if(this.map && this.loaded)this.sdk?.event.trigger(this.map,'resize');}}
   }
   clear(): void {
-    this.attempt++;this.loading=false;this.loaded=false;this.error='';this.key='';this.focused='';
+    this.attempt++;this.loading=false;this.loaded=false;this.error='';this.key='';this.focused='';this.center=null;
     for(const record of this.markers.values()){record.listener.remove();record.marker.map=null;}
     this.markers.clear();this.mapListener?.remove();
     if(this.draftMarker){this.draftMarker.map=null;this.sdk?.event.clearInstanceListeners(this.draftMarker);}
@@ -78,8 +87,9 @@ export class PinMap {
   update(state: PinMapState): void {
     const former=this.state.scope;this.state=state;
     if(former!==state.scope && this.loading){this.attempt++;this.loading=false;}
+    if(former!==state.scope)this.center=null;
     if(!this.map || !this.sdk)return;
-    if(former!==state.scope){this.focused='';this.map.panTo({lat:35.681236,lng:139.767125});}
+    if(former!==state.scope){this.focused='';this.center=null;this.map.panTo({lat:35.681236,lng:139.767125});}
     const visible=new Set(state.pins.map(p=>p.id));
     for(const [id,record]of this.markers){if(!visible.has(id)){record.listener.remove();record.marker.map=null;this.markers.delete(id);}}
     for(const pin of state.pins){
@@ -92,7 +102,7 @@ export class PinMap {
       if(record.signature!==signature){record.marker.position={lat:pin.latitude,lng:pin.longitude};record.marker.title=(pin.id===state.selected?'案内中：':'集合地点：')+pin.name;record.signature=signature;}
     }
     if(this.draftMarker){this.draftMarker.position=state.draft;this.draftMarker.map=state.draft && state.enabled && this.available()?this.map:null;}
-    const target=state.draft ?? (()=>{const p=state.pins.find(p=>p.id===state.selected);return p?{lat:p.latitude,lng:p.longitude}:null;})();
+    const target=state.draft ?? (this.center?null:(()=>{const p=state.pins.find(p=>p.id===state.selected);return p?{lat:p.latitude,lng:p.longitude}:null;})());
     const signature=JSON.stringify([state.scope,target]);
     if(target && signature!==this.focused){this.focused=signature;this.map.panTo(target);}
   }

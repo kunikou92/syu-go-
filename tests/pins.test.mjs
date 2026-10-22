@@ -79,133 +79,97 @@ test('入力検査と不正な応答（他室・存在しないメイン）を�
   await assert.rejects(pinAction(config,s,null,async()=>new Response(JSON.stringify({...r,pins:r.pins.map(p=>({...p,roomId:crypto.randomUUID()}))}))));
 });
 
-function page(s,request=backend,mapLoader){
-  const dom=new JSDOM('<div id="app"></div>',{url:'https://app.example/#/guide',runScripts:'outside-only',pretendToBeVisual:true});const w=dom.window;
-  w.AbortSignal=AbortSignal;w.fetch=request;let elapsed=100;Object.defineProperty(w.performance,'now',{value:()=>elapsed});
+function fakeMaps(){const views=[],markers=[];class View{constructor(host,options){this.options=options;this.events={};this.pans=[];views.push(this);}addListener(name,fn){this.events[name]=fn;return{remove(){}};}panTo(p){this.pans.push(p);}}class Marker{constructor(opts){Object.assign(this,opts);this.events={};markers.push(this);}addListener(name,fn){this.events[name]=fn;return{remove(){}};}append(){}}return{views,markers,api:{Map:View,marker:{AdvancedMarkerElement:Marker},event:{trigger(){},clearInstanceListeners(){}}}};}
+function page(s,request=backend,mapLoader,options={}){
+  const dom=new JSDOM('<div id="app"></div>',{url:'https://app.example/#/guide',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
+  w.AbortSignal=AbortSignal;w.fetch=request;let elapsed=100;Object.defineProperty(w.performance,'now',{value:()=>elapsed});Object.defineProperty(w,'isSecureContext',{value:true});
+  if(options.geo)Object.defineProperty(w.navigator,'geolocation',{value:{getCurrentPosition:options.geo}});
+  if(options.key)w.localStorage.setItem('syu-go:google-maps-demo-key','AIza'+'a'.repeat(35));
   const timers=new Map();w.setInterval=(fn,ms)=>{timers.set(ms,fn);return ms;};
   const store=v=>writeSession(w.localStorage,config.url,v);store(s);w.eval(bundle);
-  const source={self:{latitude:35,longitude:139,accuracyMeters:5,updatedAt:new Date().toISOString()},selfId:s.membership.participantId,roomId:s.membership.roomId,members:[],serverTime:Date.now(),elapsed:0};
-  const compass={heading:()=>0,status:()=> '方角取得済み',busy:()=>false,start:async()=>{}};
-  const terminal=[];const ui=new w.PinTest.PinsUI(config,()=>source,()=>render(),compass,status=>terminal.push(status),mapLoader);
+  const source={self:options.noSelf?null:{latitude:35,longitude:139,accuracyMeters:5,updatedAt:new Date().toISOString()},selfId:s.membership.participantId,roomId:s.membership.roomId,members:[],serverTime:Date.now(),elapsed:0};
+  const compass={heading:()=>0,status:()=> '方角取得済み',busy:()=>false,start:async()=>{}},terminal=[];
+  const ui=new w.PinTest.PinsUI(config,()=>source,()=>render(),compass,status=>terminal.push(status),mapLoader);
   function render(){w.document.querySelector('#app').innerHTML=ui.content();ui.mount();}render();
   const field=(id,v)=>{const e=w.document.querySelector('#'+id);e.value=v;e.dispatchEvent(new w.Event('input',{bubbles:true}));};
   return {w,ui,render,timers,store,source,field,terminal,advance:n=>{elapsed+=n;},button:id=>w.document.querySelector('#'+id)};
 }
-async function until(fn){for(let n=0;n<300;n++){if(fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('画面更新タイムアウト');}
-function submit(p){p.w.document.querySelector('#pin-form').dispatchEvent(new p.w.Event('submit',{bubbles:true,cancelable:true}));}
-test('画面から登録・選択・変更・メイン変更・削除でき、名前を安全に表示する',async()=>{
-  const s=await create(),p=page(s);try{
-    await until(()=>!p.button('pin-save').disabled);p.field('pin-name','<b>駅</b>');p.field('pin-latitude','35.001');p.field('pin-longitude','139');submit(p);
-    await until(()=>p.w.document.querySelectorAll('#pin-select option').length===1);assert.equal(p.w.document.querySelector('b'),null);
-    assert.match(p.w.document.querySelector('#pin-guidance').textContent,/約111m/);assert.ok(p.w.document.querySelector('.pin-direction'));
-    p.field('pin-name','広場');p.field('pin-latitude','35');p.field('pin-longitude','139.002');submit(p);
-    await until(()=>p.w.document.querySelectorAll('#pin-select option').length===2);const second=p.w.document.querySelector('#pin-select').value;
-    p.button('pin-main').click();await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('メイン集合地点を変更'));
-    assert.equal((await call(s)).mainPinId,second);
-    p.button('pin-edit').click();p.field('pin-name','広場の入口');submit(p);await until(()=>p.w.document.querySelector('#pin-guidance').textContent.includes('広場の入口'));
-    p.button('pin-delete').click();assert.equal(p.w.document.querySelector('#pin-delete-confirm').hidden,false);
-    p.button('pin-delete-yes').click();await until(()=>p.w.document.querySelectorAll('#pin-select option').length===1);
-    assert.notEqual((await call(s)).mainPinId,second);
-  }finally{p.w.close();}
-});
-test('途中のフォーム入力を保ち、他の参加者の変更・削除を反映し、再入場でメインを選ぶ',async()=>{
-  const s=await create(),f=await join(s),a=add('駅'),b=add('広場');await call(s,a);await call(s,b);const p=page(s);
-  try{await until(()=>p.w.document.querySelectorAll('#pin-select option').length===2);assert.equal(p.w.document.querySelector('#pin-select').value,a.pinId);
-    p.field('pin-name','入力中');const select=p.w.document.querySelector('#pin-select');select.value=b.pinId;select.dispatchEvent(new p.w.Event('change'));
-    let r=await call(f,{...mutate('update',b.pinId,1),name:'西の広場',latitude:35,longitude:138.99});p.timers.get(5000)();
-    await until(()=>p.w.document.querySelector('#pin-guidance').textContent.includes('西の広場'));
-    assert.equal(p.w.document.querySelector('#pin-name').value,'入力中');assert.match(p.w.document.querySelector('#pin-guidance').textContent,/西の広場/);
-    p.ui.enter();p.render();assert.equal(p.w.document.querySelector('#pin-select').value,a.pinId);
-    await call(f,mutate('main',b.pinId,r.revision));p.timers.get(5000)();await until(()=>p.w.document.querySelector('#pin-select').value===b.pinId);
-    await call(f,mutate('delete',b.pinId,2));p.timers.get(5000)();await until(()=>p.w.document.querySelector('#pin-select').value===a.pinId);
-  }finally{p.w.close();}
-});
-test('応答消失・再読み込み後も同じ操作を再送して重複させない',async()=>{
-  const s=await create();let lost=false;const p=page(s,async(url,opts)=>{const r=await backend(url,opts);if(JSON.parse(opts.body).p_action==='create'&&!lost){lost=true;throw new Error('lost');}return r;});
-  try{await until(()=>!p.button('pin-save').disabled);p.field('pin-name','再試行');p.field('pin-latitude','0');p.field('pin-longitude','0');submit(p);
-    await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('未確定'));assert.equal((await call(s)).pins.length,1);
-    assert.match(p.w.document.querySelector('#pin-form-status').textContent,/未確定/);assert.equal(p.button('pin-form-retry').hidden,false);
-    const saved={};for(let i=0;i<p.w.localStorage.length;i++){const k=p.w.localStorage.key(i);saved[k]=p.w.localStorage.getItem(k);}
-    const q=page(s);try{for(const [k,v]of Object.entries(saved))q.w.localStorage.setItem(k,v);
-      // 復帰時と同じく新しいUIを作成する。
-      const other=await create('切替');q.store(other);q.render();q.store(s);q.render();
-      await until(()=>!q.button('pin-retry').hidden);q.button('pin-retry').click();await until(()=>q.button('pin-retry').hidden);
-      assert.equal((await call(s)).pins.length,1);
-    }finally{q.w.close();}
-  }finally{p.w.close();}
-});
+async function until(fn){for(let n=0;n<300;n++){if(await fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('画面更新タイムアウト');}
+function submit(p){p.button('pin-save').click();}
+function point(p,lat=35.001,lng=139){p.field('pin-latitude',String(lat));p.field('pin-longitude',String(lng));}
 
-test('登録ボタンの近くで未入力・場所未選択・保存結果を表示し、エラーへフォーカスする',async()=>{
-  const s=await create();let changes=0;
-  const p=page(s,(url,opts)=>{if(JSON.parse(opts.body).p_action!=='read')changes++;return backend(url,opts);});
-  try{
-    await until(()=>!p.button('pin-save').disabled);p.button('pin-save').click();
-    assert.match(p.w.document.querySelector('#pin-form-status').textContent,/地点名/);
-    assert.equal(p.w.document.activeElement.id,'pin-form-status');assert.equal(changes,0);
-    p.field('pin-name','広場');p.button('pin-save').click();
-    assert.match(p.w.document.querySelector('#pin-form-status').textContent,/場所が未選択.*地図をタップ/);assert.equal(changes,0);
-    p.field('pin-latitude','35');p.field('pin-longitude','139');p.button('pin-save').click();
-    assert.match(p.button('pin-save').textContent,/確認しています/);assert.equal(p.button('pin-save').disabled,true);
-    await until(()=>p.w.document.querySelector('#pin-form-status').textContent.includes('保存しました'));
-    assert.equal(changes,1);assert.equal((await call(s)).pins.length,1);
-  }finally{p.w.close();}
+test('名前は任意で1つのピンを登録・更新し、旧選択・編集・削除・座標入力UIを表示しない',async()=>{
+ const s=await create(),p=page(s);try{await until(()=>!p.button('pin-save').disabled);point(p);submit(p);await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('保存しました'));
+ let r=await call(s);assert.equal(r.pins.length,1);assert.equal(r.pins[0].name,'集合地点');assert.equal(r.pins[0].id,s.membership.roomId);const id=r.pins[0].id;
+ for(const name of ['pin-select','pin-edit','pin-main','pin-delete'])assert.equal(p.button(name),null);
+ assert.doesNotMatch(p.w.document.body.textContent,/座標を直接入力する|向かう集合地点/);assert.equal(p.button('pin-latitude').type,'hidden');
+ p.field('pin-name','<b>駅</b>');point(p,35.002);submit(p);await until(async()=>(await call(s)).pins[0].version===2);
+ r=await call(s);assert.equal(r.pins.length,1);assert.equal(r.pins[0].id,id);assert.equal(r.pins[0].name,'<b>駅</b>');assert.equal(p.w.document.querySelector('b'),null);
+ }finally{p.w.close();}
 });
-test('自分の位置・ピンの同期が古い場合やルーム切替後は古い矢印を出さない',async()=>{
-  const s=await create();await call(s,add('北側',35.001,139));const p=page(s);try{
-    await until(()=>p.w.document.querySelector('.pin-direction'));p.source.elapsed=30000;p.ui.paint();assert.equal(p.w.document.querySelector('.pin-direction'),null);
-    p.source.elapsed=0;p.advance(30000);p.ui.paint();assert.equal(p.w.document.querySelector('.pin-direction'),null);
-    p.timers.get(5000)();await until(()=>p.w.document.querySelector('.pin-direction'));
-    const other=await create('別室');p.store(other);p.render();assert.equal(p.w.document.querySelector('.pin-direction'),null);
-  }finally{p.w.close();}
+test('同時に空のルームへ登録しても1つだけ作り、後の画面には競合を案内する',async()=>{
+ const s=await create(),f=await join(s),p=page(s),q=page(f);try{await until(()=>!p.button('pin-save').disabled&&!q.button('pin-save').disabled);point(p);point(q,36);submit(p);submit(q);
+ await until(()=>[p,q].some(x=>x.w.document.querySelector('#pins-status').textContent.includes('ほかの参加者')));assert.equal((await call(s)).pins.length,1);
+ }finally{p.w.close();q.w.close();}
 });
-test('編集開始後の競合を検出し、最新内容を読み直すまで上書きしない',async()=>{
-  const s=await create(),f=await join(s),a=add();await call(s,a);const p=page(s);
-  try{await until(()=>!p.button('pin-edit').disabled);p.button('pin-edit').click();
-    await call(f,{...mutate('update',a.pinId,1),name:'他の人の変更',latitude:33,longitude:137});
-    p.field('pin-name','古い画面');submit(p);await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('ほかの参加者'));
-    assert.equal(p.button('pin-save').disabled,true);assert.equal((await call(s)).pins[0].name,'他の人の変更');
-    p.button('pin-edit').click();assert.equal(p.w.document.querySelector('#pin-name').value,'他の人の変更');assert.equal(p.button('pin-save').disabled,false);
-  }finally{p.w.close();}
+test('既存の複数地点は消さずメイン1地点だけを表示し、他の人の更新と削除を同期する',async()=>{
+ const s=await create(),f=await join(s),a=add('駅'),b=add('広場');await call(s,a);await call(s,b);const p=page(s);try{
+ await until(()=>p.w.document.querySelector('#pin-guidance').textContent.includes('駅'));assert.doesNotMatch(p.w.document.querySelector('#pin-guidance').textContent,/広場/);
+ p.field('pin-name','入力中');await call(f,{...mutate('update',a.pinId,1),name:'西の駅',latitude:35.01,longitude:139});p.timers.get(5000)();
+ await until(()=>p.w.document.querySelector('#pin-guidance').textContent.includes('西の駅'));assert.equal(p.button('pin-name').value,'入力中');
+ await call(f,mutate('delete',a.pinId,2));p.timers.get(5000)();await until(()=>p.w.document.querySelector('#pin-guidance').textContent.includes('広場'));assert.equal((await call(s)).pins.length,1);
+ }finally{p.w.close();}
 });
-test('保存不可では送信せず、現在位置の入力は位置を新たに取得しない',async()=>{
-  const s=await create();let changes=0;const p=page(s,(url,opts)=>{if(JSON.parse(opts.body).p_action!=='read')changes++;return backend(url,opts);});
-  try{await until(()=>!p.button('pin-save').disabled);p.field('pin-name','現在地');p.button('pin-use-location').click();
-    assert.equal(p.w.document.querySelector('#pin-latitude').value,'35');assert.equal(p.w.document.querySelector('#pin-longitude').value,'139');assert.equal(changes,0);
-    const original=p.w.Storage.prototype.setItem;p.w.Storage.prototype.setItem=()=>{throw new Error('quota');};
-    submit(p);await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('保存できません'));assert.equal(changes,0);
-    p.w.Storage.prototype.setItem=original;
-  }finally{p.w.close();}
+test('応答が消えて再読み込みしても同じ操作を再送し、ピンを増やさない',async()=>{
+ const s=await create();let lost=false;const p=page(s,async(url,opts)=>{const r=await backend(url,opts);if(JSON.parse(opts.body).p_action==='create'&&!lost){lost=true;throw new Error('lost');}return r;});
+ try{await until(()=>!p.button('pin-save').disabled);point(p);submit(p);await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('未確定'));
+ const saved=Object.fromEntries(Object.entries(p.w.localStorage)),q=page(s);try{for(const [k,v]of Object.entries(saved))q.w.localStorage.setItem(k,v);const other=await create();q.store(other);q.render();q.store(s);q.render();
+ await until(()=>!q.button('pin-retry').hidden);q.button('pin-retry').click();await until(()=>q.button('pin-retry').hidden);assert.equal((await call(s)).pins.length,1);
+ }finally{q.w.close();}}finally{p.w.close();}
 });
-test('ルームを切り替えた後に前のルームの遅い応答を受け取っても表示しない',async()=>{
-  const s=await create(),other=await create('別室');await call(s,add('前の地点'));
-  let release,started=false;const gate=new Promise(r=>release=r);let first=true;
-  const p=page(s,async(...args)=>{const response=await backend(...args);if(first){first=false;started=true;await gate;}return response;});
-  try{await until(()=>started);p.store(other);p.render();release();p.timers.get(5000)();
-    await until(()=>!p.button('pin-save').disabled);assert.equal(p.w.document.querySelectorAll('#pin-select option').length,0);
-  }finally{release();p.w.close();}
+test('場所未選択の理由を登録ボタンの近くへ表示し、保存中・保存成功を案内する',async()=>{
+ const s=await create(),p=page(s);try{await until(()=>!p.button('pin-save').disabled);submit(p);assert.match(p.w.document.querySelector('#pin-form-status').textContent,/場所が未選択/);assert.equal(p.w.document.activeElement.id,'pin-form-status');
+ point(p);submit(p);assert.match(p.button('pin-save').textContent,/保存を確認中/);assert.equal(p.button('pin-save').disabled,true);await until(()=>p.w.document.querySelector('#pin-form-status').textContent.includes('保存しました'));assert.equal((await call(s)).pins[0].name,'集合地点');
+ }finally{p.w.close();}
 });
-test('ピン取得で終了を検出したときも既存の終了案内へ理由を伝える',async()=>{
-  const s=await create(),p=page(s);try{await until(()=>!p.button('pin-save').disabled);
-    await db.query("select public.room_action('leave',$1::uuid,null,$2::uuid,$3::text)",[s.membership.roomId,s.membership.participantId,s.membership.resumeToken]);
-    p.timers.get(5000)();await until(()=>p.terminal.length===1);assert.deepEqual(p.terminal,['ended']);assert.equal(p.button('pin-save').disabled,true);
-  }finally{p.w.close();}
+test('自分の位置・ピン同期の鮮度切れとルーム切替後に以前の矢印を出さない',async()=>{
+ const s=await create();await call(s,add('北側',35.001,139));const p=page(s);try{await until(()=>p.w.document.querySelector('.pin-direction'));p.source.elapsed=30000;p.ui.paint();assert.equal(p.w.document.querySelector('.pin-direction'),null);
+ p.source.elapsed=0;p.advance(30000);p.ui.paint();assert.equal(p.w.document.querySelector('.pin-direction'),null);p.timers.get(5000)();await until(()=>p.w.document.querySelector('.pin-direction'));
+ p.store(await create());p.render();assert.equal(p.w.document.querySelector('.pin-direction'),null);
+ }finally{p.w.close();}
 });
-test('Demo Keyを保存して地図を開き、タップした地点は登録するまで共有しない',async()=>{
-  const s=await create();const maps=[],markers=[];let loads=0;
-  class View{constructor(){this.events={};maps.push(this);}addListener(name,fn){this.events[name]=fn;return{remove(){}};}panTo(){}}
-  class Marker{constructor(opts){Object.assign(this,opts);this.events={};markers.push(this);}addListener(name,fn){this.events[name]=fn;return{remove(){}};}append(){}}
-  const sdk={Map:View,marker:{AdvancedMarkerElement:Marker},event:{trigger(){},clearInstanceListeners(){}}};
-  const p=page(s,backend,async()=>{loads++;return sdk;});try{
-    await until(()=>!p.button('pin-save').disabled);assert.equal(loads,0);assert.match(p.w.document.querySelector('#pin-map-status').textContent,/Demo Key/);
-    const key='AIza'+'a'.repeat(35);p.field('google-demo-key',key);
-    p.w.document.querySelector('#demo-key-form').dispatchEvent(new p.w.Event('submit',{bubbles:true,cancelable:true}));
-    await until(()=>maps.length===1);assert.equal(p.w.localStorage.getItem('syu-go:google-maps-demo-key'),key);
-    assert.equal(p.w.document.querySelector('#google-demo-key').value,'');
-    maps[0].events.click({latLng:{lat:()=>35.123,lng:()=>139.456},stop(){}});
-    assert.equal(p.w.document.querySelector('#pin-latitude').value,'35.123');assert.equal((await call(s)).pins.length,0);
-    p.field('pin-name','地図で選択');submit(p);await until(()=>p.w.document.querySelectorAll('#pin-select option').length===1);
-    const pins=(await call(s)).pins;assert.equal(pins[0].latitude,35.123);assert.equal(pins[0].longitude,139.456);assert.equal(loads,1);
-    p.button('pin-edit').click();assert.equal(loads,1);assert.equal(maps.length,1);
-    p.button('demo-key-remove').click();assert.equal(p.w.localStorage.getItem('syu-go:google-maps-demo-key'),null);
-  }finally{p.w.close();}
+test('入力中に他の人が更新した古い版で上書きせず、場所を選び直して再送できる',async()=>{
+ const s=await create(),f=await join(s),a=add();await call(s,a);const p=page(s);try{await until(()=>!p.button('pin-save').disabled);p.field('pin-name','自分の変更');point(p);
+ await call(f,{...mutate('update',a.pinId,1),name:'ほかの人',latitude:36,longitude:140});submit(p);await until(()=>p.w.document.querySelector('#pins-status').textContent.includes('ほかの参加者'));assert.equal((await call(s)).pins[0].name,'ほかの人');
+ p.button('pin-use-location').click();submit(p);await until(async()=>(await call(s)).pins[0].version===3);assert.equal((await call(s)).pins.length,1);
+ }finally{p.w.close();}
+});
+test('保存不可では送信しない。新しい公開位置を使う場合は再測位しない',async()=>{
+ const s=await create();let changes=0;const p=page(s,(url,opts)=>{if(JSON.parse(opts.body).p_action!=='read')changes++;return backend(url,opts);});try{await until(()=>!p.button('pin-save').disabled);p.button('pin-use-location').click();assert.equal(p.button('pin-latitude').value,'35');assert.equal(changes,0);
+ const original=p.w.Storage.prototype.setItem;p.w.Storage.prototype.setItem=()=>{throw new Error('quota');};submit(p);assert.match(p.w.document.querySelector('#pins-status').textContent,/保存できません/);assert.equal(changes,0);p.w.Storage.prototype.setItem=original;
+ }finally{p.w.close();}
+});
+test('キー設定済みなら地図を自動で現在地中心に開き、選択・登録・再描画で地図を再利用する',async()=>{
+ const s=await create(),maps=fakeMaps();let loads=0;const p=page(s,backend,async()=>{loads++;return maps.api;},{key:true});try{await until(()=>maps.views.length===1&&!p.button('pin-save').disabled);assert.equal(maps.views[0].options.center.lat,35);assert.equal(loads,1);
+ maps.views[0].events.click({latLng:{lat:()=>35.123,lng:()=>139.456}});assert.equal((await call(s)).pins.length,0);submit(p);await until(async()=>(await call(s)).pins.length===1);assert.equal((await call(s)).pins[0].latitude,35.123);
+ p.render();assert.equal(maps.views.length,1);assert.equal(loads,1);p.button('demo-key-remove').click();assert.equal(p.w.localStorage.getItem('syu-go:google-maps-demo-key'),null);
+ }finally{p.w.close();}
+});
+test('位置共有OFFでも地図用に測位でき、取得だけではルームに送信・ピン保存しない',async()=>{
+ const s=await create(),maps=fakeMaps();let geoCalls=0,changes=0;
+ const p=page(s,(url,opts)=>{if(JSON.parse(opts.body).p_action!=='read')changes++;return backend(url,opts);},async()=>maps.api,{key:true,noSelf:true,geo:ok=>{geoCalls++;ok({timestamp:Date.now(),coords:{latitude:34.5,longitude:135.5}});}});
+ try{await until(()=>maps.views.length===1);assert.equal(geoCalls,1);assert.equal(maps.views[0].options.center.lat,34.5);assert.equal(changes,0);assert.equal((await call(s)).pins.length,0);assert.equal(p.button('pin-latitude').value,'');
+ await until(()=>!p.button('pin-use-location').disabled);p.button('pin-use-location').click();await until(()=>p.button('pin-latitude').value==='34.5');assert.equal(changes,0);
+ }finally{p.w.close();}
+});
+test('位置許可拒否でも地図を開き、理由を案内する',async()=>{
+ const s=await create(),maps=fakeMaps(),p=page(s,backend,async()=>maps.api,{key:true,noSelf:true,geo:(_ok,fail)=>fail({code:1})});try{await until(()=>maps.views.length===1);assert.match(p.w.document.querySelector('#pin-location-status').textContent,/許可されていません/);assert.equal((await call(s)).pins.length,0);}finally{p.w.close();}
+});
+test('退出・ルーム切替・友達モードへ移動後の遅い測位結果を使わない',async()=>{
+ const s=await create(),maps=fakeMaps();let finish;const p=page(s,backend,async()=>maps.api,{key:true,noSelf:true,geo:ok=>{finish=ok;}});
+ try{await until(()=>finish);p.ui.leave();p.w.document.querySelector('#app').replaceChildren();finish({timestamp:Date.now(),coords:{latitude:1,longitude:2}});await new Promise(r=>setTimeout(r,20));assert.equal(maps.views.length,0);assert.equal((await call(s)).pins.length,0);
+ }finally{p.w.close();}
+});
+test('ピン取得で終了を検出した際に終了理由を引き継ぐ',async()=>{
+ const s=await create(),p=page(s);try{await until(()=>!p.button('pin-save').disabled);await db.query("select public.room_action('leave',$1::uuid,null,$2::uuid,$3::text)",[s.membership.roomId,s.membership.participantId,s.membership.resumeToken]);p.timers.get(5000)();await until(()=>p.terminal.length===1);assert.deepEqual(p.terminal,['ended']);assert.equal(p.button('pin-save').disabled,true);}finally{p.w.close();}
 });
