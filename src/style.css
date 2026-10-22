@@ -47,4 +47,18 @@ footer a { display: inline-block; padding: 12px 0; text-decoration: underline; }
 .state-pill.is-arrived { background: #294f3e; color: white; }
 #participant-count { font-size: 12px; font-weight: normal; }
 #arrival-control[hidden] { display: none; }
+.friends-radar { width: 260px; height: 260px; max-width: 100%; position: relative; margin: 28px auto; border: 1px solid #acbdac; border-radius: 50%; background: radial-gradient(circle, #e6ecdf 0 22%, transparent 23% 44%, #e6ecdf 45% 46%, transparent 47%); }
+.friends-radar[hidden] { display: none; }
+.radar-forward { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 12px; }
+.radar-self { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; }
+.friend-marker { position: absolute; width: 36px; height: 36px; transform: translate(-50%, -50%); border-radius: 50%; background: #294f3e; color: #fff; display: flex; align-items: center; justify-content: center; gap: 2px; box-shadow: 0 0 0 3px #fffef8; }
+.friend-marker b { font-size: 11px; }
+.friend-arrow { display: inline-block; font-size: 23px; line-height: 1; }
+.friends-list { margin: 0; padding: 0; list-style: none; }
+.friend-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 32px; gap: 10px; align-items: center; border-top: 1px solid #e1e5da; padding: 16px 0; }
+.friend-row p { margin: 0 0 4px; }
+.friend-number { font-size: 12px; border: 1px solid #acbdac; border-radius: 50%; width: 24px; height: 24px; text-align: center; }
+.friend-distance { font-size: 22px; font-weight: bold; }
+.friend-row-arrow { font-size: 36px; line-height: 1; text-align: center; }
+@media (max-width: 374px) { .friends-card { padding: 16px 8px; } }
 @media (min-width: 700px) { .shell { padding-top: 40px; } }

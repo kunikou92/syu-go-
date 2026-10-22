@@ -4,6 +4,7 @@ import type { SharedLocation } from './domain';
 import { activeSession, acceptReply, readSession, statusMessages } from './membership';
 import { locationAction, locationFresh, validLocation } from './location';
 import type { LocatedParticipant, LocationReply } from './location';
+import type { FriendSource } from './friends-ui';
 
 const html = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const key = (s: Session | null) => s ? `${s.membership.roomId}:${s.membership.participantId}` : '';
@@ -82,7 +83,14 @@ export class LocationUI {
       <button id="location-stop" class="button secondary" type="button">位置公開をOFFにする</button></div>
       <p id="location-status" role="status"></p><p id="my-location" class="hint"></p>
       <ul id="location-members" class="participants-list" aria-label="位置の共有状況"></ul>
-      <p class="hint">画面を閉じている間や背景での更新は保証されません。方角・距離の案内は今後追加します。</p></section>`;
+      <p class="hint">画面を閉じている間や背景での更新は保証されません。案内画面の友達モードで方向と距離を確認できます。</p></section>`;
+  }
+  guidance(): FriendSource | null {
+    this.syncScope();
+    if (!this.session || document.hidden) return null;
+    return { self: this.running && this.sharing ? this.lastFix : null,
+      selfId: this.session.membership.participantId, roomId: this.session.membership.roomId,
+      members: this.members, serverTime: this.serverTime, elapsed: performance.now() - this.receivedAt };
   }
   mount(): void {
     this.syncScope();
