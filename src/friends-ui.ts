@@ -12,8 +12,8 @@ const html = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&l
 const text = (node: Element, value: string) => { if (node.textContent !== value) node.textContent = value; };
 export class FriendsUI {
   private compass: Compass;
-  constructor(private source: () => FriendSource | null) {
-    this.compass = new Compass(() => this.paint());
+  constructor(private source: () => FriendSource | null, compass?: Compass) {
+    this.compass = compass ?? new Compass(() => this.paint());
     window.setInterval(() => this.paint(), 250);
   }
   content(): string {

@@ -60,5 +60,25 @@ footer a { display: inline-block; padding: 12px 0; text-decoration: underline; }
 .friend-number { font-size: 12px; border: 1px solid #acbdac; border-radius: 50%; width: 24px; height: 24px; text-align: center; }
 .friend-distance { font-size: 22px; font-weight: bold; }
 .friend-row-arrow { font-size: 36px; line-height: 1; text-align: center; }
+.mode-switch { display: flex; gap: 10px; }
+.mode-switch .button { flex: 1; justify-content: center; padding: 12px 8px; }
+.mode-switch [aria-pressed="true"] { background: #294f3e; color: #fff; }
+select { width: 100%; min-height: 48px; margin: 10px 0; border: 1px solid #acbdac; border-radius: 10px; padding: 10px; background: #fff; color: inherit; font: inherit; }
+select:focus-visible { outline: 3px solid #b47b23; outline-offset: 3px; }
+.coordinate-inputs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.pin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pin-actions .button { flex: 1 1 110px; font-size: 12px; padding: 10px; margin: 4px 0; }
+.pin-destination { text-align: center; padding: 12px 0; }
+.pin-coordinates { overflow-wrap: anywhere; }
+.pin-direction { width: 110px; height: 110px; border: 1px solid #acbdac; border-radius: 50%; margin: 16px auto; display: grid; place-items: center; background: #e6ecdf; }
+.pin-direction span { font-size: 76px; display: inline-block; line-height: 1; }
+#pin-retry[hidden], #pin-delete-confirm[hidden], #pin-cancel-edit[hidden] { display: none; }
+.pin-map-canvas { width: 100%; height: 340px; border-radius: 14px; background: #e6ecdf; }
+#pin-map-slot { margin: 16px 0; }
+#pin-map-slot[hidden], #pin-map-reload[hidden] { display: none; }
+.map-settings, .coordinate-details { margin: 18px 0; padding: 12px; border: 1px solid #d5dccf; border-radius: 12px; }
+summary { cursor: pointer; font-weight: bold; }
+.text-link { text-decoration: underline; display: inline-block; padding: 8px 0; }
+.draft-map-pin { display: grid; place-items: center; min-width: 38px; height: 38px; background: #b47b23; color: white; border: 3px solid white; box-shadow: 0 2px 8px #243d3570; border-radius: 50%; font-weight: bold; }
 @media (max-width: 374px) { .friends-card { padding: 16px 8px; } }
 @media (min-width: 700px) { .shell { padding-top: 40px; } }

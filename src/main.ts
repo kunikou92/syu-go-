@@ -6,13 +6,19 @@ import { readSession } from './membership';
 import { ParticipantsUI } from './participants-ui';
 import { LocationUI } from './location-ui';
 import { FriendsUI } from './friends-ui';
+import { PinsUI } from './pins-ui';
+import { Compass } from './compass';
 
 const config = backendConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 let creating = false;
 const roomUI = new RoomUI(config, () => render());
 const participantsUI = new ParticipantsUI(config, () => render(), (status) => roomUI.notifyTerminal(status));
 const locationUI = new LocationUI(config);
-const friendsUI = new FriendsUI(() => locationUI.guidance());
+const compass = new Compass(() => {friendsUI.paint();pinsUI.paint();});
+const friendsUI = new FriendsUI(() => locationUI.guidance(),compass);
+const pinsUI = new PinsUI(config,() => locationUI.guidance(),() => render(),compass,status => roomUI.notifyTerminal(status));
+let mode: 'friends' | 'pin' = 'friends';
+let modeScope = '';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('表示先が見つかりません。');
@@ -57,6 +63,8 @@ const views = {
 } as const;
 
 function render() {
+  const scope=roomUI.session()?.membership.roomId ?? '';
+  if(scope!==modeScope){modeScope=scope;mode='friends';}
   const path = (window.location.hash.slice(1) || '/').split('?')[0];
   const view = views[path as keyof typeof views];
   let content = view
@@ -64,10 +72,12 @@ function render() {
     : `<p class="eyebrow">NOT FOUND</p><h1>ページが<br>見つかりません。</h1><a class="button" href="#/">ホームに戻る →</a>`;
   if (path === '/created') content = createdContent() + participantsUI.content() + locationUI.content();
   if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1>友達の待つ<br>ルームへ。</h1>${roomUI.joinContent()}`;
-  if (path === '/guide') content = `<p class="eyebrow">GUIDANCE</p><h1>さあ、<br>合流しよう。</h1>${roomUI.guideContent()}${friendsUI.content()}${locationUI.content()}${participantsUI.content()}`;
+  if (path === '/guide') content = `<p class="eyebrow">GUIDANCE</p><h1>さあ、<br>合流しよう。</h1>${roomUI.guideContent()}
+    <div class="mode-switch" role="group" aria-label="案内モード"><button id="mode-friends" class="button secondary" type="button" aria-pressed="${mode==='friends'}">友達モード</button><button id="mode-pins" class="button secondary" type="button" aria-pressed="${mode==='pin'}">ピンモード</button></div>
+    ${mode==='friends'?friendsUI.content():pinsUI.content()}${locationUI.content()}${participantsUI.content()}`;
   app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー<span>集合！</span></a><span class="badge">開発中</span></header>
     <main id="main" tabindex="-1">${content}</main>
-    <footer><p>開発中です。集合地点のピン・手動での方角調整は、これから追加します。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
+    <footer><p>開発中です。手動での方角調整は、これから追加します。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
   document.title = `${path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
   document.querySelector<HTMLFormElement>('#create-form')?.addEventListener('submit', handleCreate);
   document.querySelector<HTMLButtonElement>('#copy-invite')?.addEventListener('click', copyInvitation);
@@ -75,6 +85,9 @@ function render() {
   participantsUI.mount();
   locationUI.mount();
   friendsUI.mount();
+  if(mode==='pin')pinsUI.mount();
+  document.querySelector('#mode-friends')?.addEventListener('click',() => {mode='friends';render();});
+  document.querySelector('#mode-pins')?.addEventListener('click',() => {if(mode!=='pin')pinsUI.enter();mode='pin';render();});
   const input = document.querySelector<HTMLInputElement>('#nickname');
   if (input && config) {
     try {
