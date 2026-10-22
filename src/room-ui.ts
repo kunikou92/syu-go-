@@ -3,7 +3,7 @@ import type { RoomInvitation } from './domain';
 import { invitationUrl } from './rooms';
 import { acceptReply, activeSession, parseInvitation, pendingDepartures, prepareJoin, readSession, requestLeave,
   roomAction, statusMessages, writeSession } from './membership';
-import type { RoomReply, Session } from './membership';
+import type { RoomReply, RoomStatus, Session } from './membership';
 
 const html = (value: string) => value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 export class RoomUI {
@@ -41,6 +41,10 @@ export class RoomUI {
   session(): Session | null {
     try { return this.config && activeSession(localStorage, this.config.url); }
     catch { return null; }
+  }
+
+  notifyTerminal(status: RoomStatus): void {
+    this.terminal = statusMessages[status];
   }
 
   created(result: CreatedRoom, resumeToken: string): void {

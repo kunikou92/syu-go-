@@ -3,10 +3,12 @@ import { ROOM_POLICY } from './domain';
 import { backendConfig, createRoom, CreationExpiredError, invitationUrl, loadCreation, normalizeNickname, pendingCreation, saveCreation } from './rooms';
 import { RoomUI } from './room-ui';
 import { readSession } from './membership';
+import { ParticipantsUI } from './participants-ui';
 
 const config = backendConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 let creating = false;
 const roomUI = new RoomUI(config, () => render());
+const participantsUI = new ParticipantsUI(config, () => render(), (status) => roomUI.notifyTerminal(status));
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('表示先が見つかりません。');
@@ -48,7 +50,6 @@ const views = {
     title: 'さあ、<br>合流しよう。',
     body: `<p class="lead">友達や集合地点への案内を表示する画面です。</p>
       <section class="card"><h2>友達・集合地点の案内</h2><div class="empty-arrow" aria-hidden="true">↑</div><p>案内はまだ始まっていません。</p><p class="hint">方向・距離とモード切り替えは、これから追加します。</p></section>
-      <section class="card"><h2>参加者</h2><p>参加者はまだ表示されていません。</p></section>
       <p class="privacy">位置公開の初期状態はOFFです。</p>`,
   },
 } as const;
@@ -59,16 +60,17 @@ function render() {
   let content = view
     ? `<p class="eyebrow">${view.label}</p><h1>${view.title}</h1>${view.body}`
     : `<p class="eyebrow">NOT FOUND</p><h1>ページが<br>見つかりません。</h1><a class="button" href="#/">ホームに戻る →</a>`;
-  if (path === '/created') content = createdContent();
+  if (path === '/created') content = createdContent() + participantsUI.content();
   if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1>友達の待つ<br>ルームへ。</h1>${roomUI.joinContent()}`;
-  if (path === '/guide') content = `<p class="eyebrow">GUIDANCE</p><h1>さあ、<br>合流しよう。</h1>${roomUI.guideContent()}${views['/guide'].body}`;
+  if (path === '/guide') content = `<p class="eyebrow">GUIDANCE</p><h1>さあ、<br>合流しよう。</h1>${roomUI.guideContent()}${participantsUI.content()}${views['/guide'].body}`;
   app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー<span>集合！</span></a><span class="badge">開発中</span></header>
     <main id="main" tabindex="-1">${content}</main>
-    <footer><p>開発中です。参加者一覧・位置共有・方向案内は、これから追加します。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
+    <footer><p>開発中です。位置共有・方向案内は、これから追加します。</p>${path !== '/' ? '<a href="#/">← ホームに戻る</a>' : ''}</footer></div>`;
   document.title = `${path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
   document.querySelector<HTMLFormElement>('#create-form')?.addEventListener('submit', handleCreate);
   document.querySelector<HTMLButtonElement>('#copy-invite')?.addEventListener('click', copyInvitation);
   roomUI.mount();
+  participantsUI.mount();
   const input = document.querySelector<HTMLInputElement>('#nickname');
   if (input && config) {
     try {

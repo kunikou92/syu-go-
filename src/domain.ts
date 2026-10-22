@@ -49,6 +49,17 @@ export interface Participant {
   location: SharedLocation | null;
 }
 
+/** 一覧用の公開項目。座標や招待・復帰用の秘密値を含めない。 */
+export interface ParticipantSummary {
+  id: ParticipantId;
+  roomId: RoomId;
+  nickname: string;
+  arrived: boolean;
+  lastSeenAt: Timestamp;
+  online: boolean;
+  locationSharing: boolean;
+}
+
 export interface Pin extends Coordinates {
   id: PinId;
   roomId: RoomId;

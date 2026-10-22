@@ -37,4 +37,14 @@ input[aria-invalid="true"] { border-color: #a13424; }
 #create-status, #copy-status { font-size: 13px; overflow-wrap: anywhere; }
 footer { border-top: 1px solid #d5dccf; margin-top: 36px; padding-top: 16px; }
 footer a { display: inline-block; padding: 12px 0; text-decoration: underline; }
+.participants-list { list-style: none; margin: 0; padding: 0; }
+.participant-row { border-top: 1px solid #e1e5da; padding: 14px 0; }
+.participant-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: bold; overflow-wrap: anywhere; margin: 0 0 8px; }
+.self-label { font-size: 11px; color: #637065; font-weight: normal; }
+.participant-states { display: flex; flex-wrap: wrap; gap: 6px; }
+.state-pill { border-radius: 20px; padding: 3px 9px; background: #eeeee7; font-size: 11px; color: #526052; }
+.state-pill.is-online { background: #e0edde; color: #2b5938; }
+.state-pill.is-arrived { background: #294f3e; color: white; }
+#participant-count { font-size: 12px; font-weight: normal; }
+#arrival-control[hidden] { display: none; }
 @media (min-width: 700px) { .shell { padding-top: 40px; } }
