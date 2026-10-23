@@ -85,7 +85,7 @@ export class LocationUI {
       <p class="hint">OFFにすると取得・送信を停止し、共有済みの位置を削除します。通信できない間は削除が未確定です。30秒更新されない位置は案内に使いません。</p>
       <p id="my-location" class="hint"></p>
       <ul id="location-members" class="participants-list" aria-label="位置の共有状況"></ul>
-      <p class="hint">画面を閉じている間や背景での更新は保証されません。案内画面の友達モードで方向と距離を確認できます。</p></details></section>`;
+      <p class="hint">画面を閉じている間や背景での更新は保証されません。案内画面の合流モードで方向と距離を確認できます。</p></details></section>`;
   }
   guidance(): FriendSource | null {
     this.syncScope();

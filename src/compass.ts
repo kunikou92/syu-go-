@@ -7,6 +7,7 @@ export class Compass {
   private requesting = false;
   private value: number | null = null;
   private at = 0;
+  private startedAt = 0;
   private manual = false;
   private manualValue: number | null = null;
   private attempt = 0;
@@ -36,11 +37,17 @@ export class Compass {
   status(): string {
     if (this.manual) return this.manualValue === null ? '手動調整中です。画面の上が向いている方角を指定し直してください。'
       : `手動調整中：画面の上は北から時計回りに${Math.round(this.manualValue)}°です。スマホを向け直したら調整してください。`;
+    if (this.enabled && this.value === null && performance.now() - this.startedAt >= 8000)
+      return '方角を取得できていません。スマホを水平に持ち、コンパスを再試行するか、手動で方角を調整してください。';
     return this.enabled && this.value !== null && this.heading() === null
       ? 'コンパスの更新が止まっています。端末を水平に持ってください。' : this.message;
   }
   busy(): boolean { return this.requesting; }
   isManual(): boolean { return this.manual; }
+  async ensureStarted(): Promise<void> {
+    if (this.manual || this.enabled || this.requesting) return;
+    await this.start();
+  }
   useManual(): void {
     const previous = this.heading();
     this.attempt++; this.requesting = false; this.enabled = false; this.value = null;
@@ -64,7 +71,7 @@ export class Compass {
       // iPhoneの許可要求はボタン操作から直接呼ぶ。
       const permission = api.requestPermission ? await api.requestPermission(true) : 'granted';
       if (attempt !== this.attempt) return;
-      this.enabled = permission === 'granted'; this.value = null;
+      this.enabled = permission === 'granted'; this.value = null; this.startedAt = performance.now();
       this.message = this.enabled ? '方角を待っています。スマホを水平に持ってください。'
         : 'コンパスが許可されていません。ブラウザーの設定を確認して再試行してください。';
     } catch { if (attempt === this.attempt) { this.enabled = false; this.value = null; this.message = 'コンパスを開始できません。ブラウザーの設定を確認して再試行してください。'; } }

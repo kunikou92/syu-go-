@@ -88,7 +88,7 @@ function page(s,request=backend,mapLoader,options={}){
   const timers=new Map();w.setInterval=(fn,ms)=>{timers.set(ms,fn);return ms;};
   const store=v=>writeSession(w.localStorage,config.url,v);store(s);w.eval(bundle);
   const source={self:options.noSelf?null:{latitude:35,longitude:139,accuracyMeters:5,updatedAt:new Date().toISOString()},selfId:s.membership.participantId,roomId:s.membership.roomId,members:[],serverTime:Date.now(),elapsed:0};
-  const compass={heading:()=>0,status:()=> '方角取得済み',busy:()=>false,start:async()=>{}},terminal=[];
+  const compass={heading:()=>0,status:()=> '方角取得済み',busy:()=>false,start:async()=>{},ensureStarted:async()=>{}},terminal=[];
   const ui=new w.PinTest.PinsUI(config,()=>source,()=>render(),compass,status=>terminal.push(status),mapLoader);
   function render(){w.document.querySelector('#app').innerHTML=ui.content();ui.mount();}render();
   const field=(id,v)=>{const e=w.document.querySelector('#'+id);e.value=v;e.dispatchEvent(new w.Event('input',{bubbles:true}));};
@@ -153,6 +153,25 @@ test('キー設定済みなら地図を自動で現在地中心に開き、選�
  const s=await create(),maps=fakeMaps();let loads=0;const p=page(s,backend,async()=>{loads++;return maps.api;},{key:true});try{await until(()=>maps.views.length===1&&!p.button('pin-save').disabled);assert.equal(maps.views[0].options.center.lat,35);assert.equal(loads,1);
  maps.views[0].events.click({latLng:{lat:()=>35.123,lng:()=>139.456}});assert.equal((await call(s)).pins.length,0);submit(p);await until(async()=>(await call(s)).pins.length===1);assert.equal((await call(s)).pins[0].latitude,35.123);
  p.render();assert.equal(maps.views.length,1);assert.equal(loads,1);p.button('demo-key-remove').click();assert.equal(p.w.localStorage.getItem('syu-go:google-maps-demo-key'),null);
+ }finally{p.w.close();}
+});
+
+test('地図の直下に名前とボタンを置き、位置の変更は名前をリセットし、名前だけでも更新できる',async()=>{
+ const s=await create(),maps=fakeMaps();await call(s,add('元の場所',35.1,139.1));
+ const p=page(s,backend,async()=>maps.api,{key:true});try{
+  await until(()=>maps.views.length===1&&!p.button('pin-save').disabled);
+  const ids=[...p.w.document.querySelectorAll('#pin-map-slot, #pin-name, #pin-use-location, #pin-save')].map(e=>e.id);
+  assert.deepEqual(ids,['pin-map-slot','pin-name','pin-use-location','pin-save']);
+  assert.match(p.button('pin-name').placeholder,/入力したら更新/);
+  assert.equal(p.w.document.querySelector('#pin-location-status').textContent,'');
+  p.field('pin-name','名前だけ変更');submit(p);
+  await until(async()=>(await call(s)).pins[0].version===2);
+  await until(()=>p.button('pin-name').value==='');
+  assert.equal((await call(s)).pins[0].name,'名前だけ変更');assert.equal((await call(s)).pins[0].latitude,35.1);
+  p.field('pin-name','前の位置用の名前');maps.views[0].events.click({latLng:{lat:()=>36,lng:()=>140}});
+  assert.equal(p.button('pin-name').value,'');submit(p);
+  await until(async()=>(await call(s)).pins[0].version===3);
+  assert.equal((await call(s)).pins[0].name,'集合地点');assert.equal((await call(s)).pins[0].latitude,36);
  }finally{p.w.close();}
 });
 test('位置共有OFFでも地図用に測位でき、取得だけではルームに送信・ピン保存しない',async()=>{

@@ -2,6 +2,7 @@ import type { SharedLocation } from './domain';
 import type { LocatedParticipant } from './location';
 import { locationFresh } from './location';
 import { Compass } from './compass';
+import { compassLoading } from './compass-ui';
 import { degrees, directionTo, distanceLabel, markerPositions } from './friends';
 
 export interface FriendSource {
@@ -17,14 +18,13 @@ export class FriendsUI {
     window.setInterval(() => this.paint(), 250);
   }
   content(headingControls = ''): string {
-    return `<section class="card friends-card" aria-label="友達の案内">
-      <p class="hint">スマホを水平に持ってください。矢印は直線方向、距離は直線距離の目安です。</p>
-      <button id="compass-start" class="button secondary" type="button">コンパスを有効にする・再試行</button>
+    return `<section class="card friends-card" aria-label="合流の案内">
+      <button id="compass-start" class="button secondary compass-refresh" type="button">コンパス更新</button>
       <p id="compass-status" class="hint" role="status"></p><p id="friends-status" role="status"></p>
       <div id="friends-radar" class="friends-radar" aria-hidden="true" hidden></div>
       <ol id="friends-list" class="friends-list" aria-label="友達の方向と距離"></ol>
       ${headingControls}
-      <p class="hint">番号は下の名前に対応します。重なる番号をずらしても、矢印が指す向きは変わりません。道路や障害物に沿った経路案内ではありません。</p></section>`;
+      <p class="hint">番号は下の名前に対応します。重なる番号をずらしても、矢印が指す向きは変わりません。距離は直線距離です。道路に沿った移動距離・経路案内ではありません。</p></section>`;
   }
   mount(): void {
     document.querySelector('#compass-start')?.addEventListener('click', () => void this.compass.start());
@@ -42,10 +42,11 @@ export class FriendsUI {
       p.locationSharing && locationFresh(p.location, source.serverTime, source.elapsed)).map(p => ({
         ...p, ...directionTo(own, p.location!),
       })) : [];
-    text(status, !source ? 'ルームに参加すると友達を案内できます。' : !own
+    const statusMarkup = !source ? 'ルームに参加すると友達を案内できます。' : !own
       ? '自分の新しい位置が必要です。「位置の共有」をONにするか、位置の更新をお待ちください。'
       : !friends.length ? '今は案内できる友達がいません。友達の参加・位置公開・位置の更新をお待ちください。'
-      : heading === null ? `${friends.length}人の距離を表示しています。方角を取得すると矢印を表示します。` : `${friends.length}人の方向と距離を表示しています。`);
+      : heading === null ? compassLoading : `${friends.length}人の方向と距離を表示しています。`;
+    if (status.innerHTML !== statusMarkup) status.innerHTML = statusMarkup;
     const arrows = friends.filter(p => heading !== null && p.bearing !== null);
     const angles = arrows.map(p => degrees(p.bearing! - heading!)), positions = markerPositions(angles);
     radar.hidden = !arrows.length;

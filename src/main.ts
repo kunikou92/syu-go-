@@ -71,9 +71,9 @@ function render() {
   if (path === '/') content = views['/'].body;
   if (path === '/created') content = createdContent();
   if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1 class="join-title">友達の待つルームへ。</h1>${roomUI.joinContent()}`;
-  if (path === '/guide') content = `${mode==='friends'?locationUI.content():''}
-    <div class="mode-switch" role="group" aria-label="案内モード"><button id="mode-friends" class="button secondary" type="button" aria-pressed="${mode==='friends'}">友達モード</button><button id="mode-pins" class="button secondary" type="button" aria-pressed="${mode==='pin'}">ピンモード</button></div>
-    ${mode==='friends'?friendsUI.content(compassUI.content()):pinsUI.content(compassUI.content())}${mode==='pin'?locationUI.content():''}${participantsUI.content()}${roomUI.guideContent()}`;
+  if (path === '/guide') content = `${locationUI.content()}
+    <div class="mode-switch" role="group" aria-label="案内モード"><button id="mode-friends" class="button secondary" type="button" aria-pressed="${mode==='friends'}">合流モード</button><button id="mode-pins" class="button secondary" type="button" aria-pressed="${mode==='pin'}">ピンモード</button></div>
+    ${mode==='friends'?friendsUI.content(compassUI.content()):pinsUI.content(compassUI.content())}${participantsUI.content()}${roomUI.guideContent()}`;
   const simple = path === '/' || path === '/created';
   app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー</a>${simple?'':'<span class="badge">開発中</span>'}</header>
     <main id="main" tabindex="-1">${content}</main>

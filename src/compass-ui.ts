@@ -1,5 +1,7 @@
 import { Compass } from './compass';
 
+export const compassLoading = '<span class="compass-loading" role="status"><span>コンパス読み込み中...</span><span class="loading-spinner" aria-hidden="true"></span></span>';
+
 /** 両案内モードが同じ端末内の方角設定を利用する。 */
 export class CompassUI {
   constructor(private compass: Compass) {
@@ -9,7 +11,7 @@ export class CompassUI {
     return `<div class="heading-settings">
       <button id="heading-manual" class="button secondary" type="button" aria-controls="heading-adjustment" aria-expanded="false">手動で方角を調整する</button>
       <div id="heading-adjustment" hidden>
-        <p class="hint">コンパスが使えない・方向がずれる場合は、手動で指定できます。友達モードとピンモードの両方に反映します。</p>
+        <p class="hint">コンパスが使えない・方向がずれる場合は、手動で指定できます。合流モードとピンモードの両方に反映します。</p>
         <p id="heading-help" class="hint">地図や目印で方角を確かめ、画面の上が向いている方角を選んでください。0°は北、90°は東、180°は南、270°は西です。スマホを向け直したら再調整してください。</p>
         <div class="heading-presets" role="group" aria-label="画面の上が向いている方角">
           ${[['北',0],['東',90],['南',180],['西',270]].map(([name,angle]) => `<button class="button secondary" type="button" data-heading="${angle}">${name}</button>`).join('')}

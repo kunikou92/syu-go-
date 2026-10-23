@@ -6,6 +6,7 @@ import type { SharedPin, PinChange, PinReply } from './pins';
 import { pinAction, pinFields } from './pins';
 import { locationFresh } from './location';
 import { Compass } from './compass';
+import { compassLoading } from './compass-ui';
 import { degrees, directionTo, distanceLabel } from './friends';
 import { PinMap } from './pin-map';
 import { demoKey, savedDemoKey, DEMO_KEY_STORAGE, validPoint } from './google-maps';
@@ -51,17 +52,17 @@ export class PinsUI {
     return `<section class="card pin-map-card" aria-label="集合地点の地図">
       <div id="pin-map-slot"></div>
       <form id="pin-form" novalidate>
+        <label for="pin-name">ピンの名前(任意)</label><input id="pin-name" value="${html(this.draft.name)}" placeholder="入力したら更新ボタンを押してください" aria-describedby="pin-form-status">
         <div class="pin-create-actions"><button id="pin-use-location" class="button secondary" type="button">現在位置を設定</button><button id="pin-save" class="button" type="submit">集合地点を追加</button></div>
         <p id="pin-map-status" class="hint" role="status"></p><p id="pin-location-status" class="hint" role="status"></p>
         <button id="pin-map-reload" class="button secondary" type="button" hidden>画面を再読み込みする</button>
-        <label for="pin-name">ピンの名前(任意)</label><input id="pin-name" value="${html(this.draft.name)}" placeholder="集合地点" aria-describedby="pin-form-status">
         <input id="pin-latitude" type="hidden" value="${html(this.draft.latitude)}"><input id="pin-longitude" type="hidden" value="${html(this.draft.longitude)}">
         <p id="pin-picked-position" class="hint" role="status"></p><p id="pin-form-status" class="notice" role="status" tabindex="-1"></p>
         <button id="pin-retry" class="button secondary" type="button" hidden>前回の操作結果を再確認する</button>
       </form>
       <p id="pins-status" class="hint" role="status"></p>
       <div id="pin-guidance" aria-live="off"></div>
-      <button id="pin-compass" class="button secondary" type="button">コンパスを有効にする・再試行</button><p id="pin-compass-status" class="hint" role="status"></p>
+      <button id="pin-compass" class="button secondary compass-refresh" type="button">コンパス更新</button><p id="pin-compass-status" class="hint" role="status"></p>
       ${headingControls}
       <details class="map-settings" ${savedDemoKey(localStorage)?'':'open'}><summary>確認用の地図設定</summary>
         <p class="hint">GoogleのDemo Keyをこのブラウザーに設定してください。</p><a class="text-link" href="https://developers.google.com/maps/demo-key" target="_blank" rel="noopener noreferrer">Google公式ページでDemo Keyを取得 ↗</a>
@@ -79,6 +80,7 @@ export class PinsUI {
     document.querySelector('#pin-form')?.addEventListener('submit',event=>{event.preventDefault();void this.submit();});
     document.querySelector('#pin-retry')?.addEventListener('click',()=>void this.save());
     document.querySelector('#pin-use-location')?.addEventListener('click',()=>void this.locate(true));
+    document.querySelector('#pin-compass')?.addEventListener('click',()=>void this.compass.start());
     document.querySelectorAll<HTMLInputElement>('#pin-form input').forEach(input=>input.addEventListener('input',()=>{this.captureDraft();this.paint();}));
     this.paint();void this.sync();
     if(this.autoScope!==this.scope || !this.autoScope){this.autoScope=this.scope||'no-room';void this.initializeMap();}
@@ -112,7 +114,7 @@ export class PinsUI {
       if(!valid())return;
       this.mapPicker.centerOn(point);
       if(setPin)this.setPoint(point);
-      this.locationMessage=setPin?'現在位置に仮ピンを置きました。追加・更新ボタンで登録してください。':'現在地を中心に表示しています。地図用の位置はルームへ共有しません。';
+      this.locationMessage=setPin?'現在位置に仮ピンを置きました。追加・更新ボタンで登録してください。':'';
     }catch(error){if(valid())this.locationMessage=(error as Error).message;}
     finally{if(attempt===this.geoAttempt){this.locating=false;this.paint();}}
   }
@@ -125,11 +127,20 @@ export class PinsUI {
   private draftPoint():MapPoint|null {const p={lat:Number(this.draft.latitude),lng:Number(this.draft.longitude)};return this.draft.latitude.trim()&&this.draft.longitude.trim()&&validPoint(p)?p:null;}
   private captureDraft():void {
     const name=document.querySelector<HTMLInputElement>('#pin-name');if(!name)return;
-    if(!this.hasDraft){this.base=this.chosen()?{...this.chosen()!}:null;this.hasDraft=true;}
+    if(!this.hasDraft){
+      this.base=this.chosen()?{...this.chosen()!}:null;this.hasDraft=true;
+      if(this.base){
+        document.querySelector<HTMLInputElement>('#pin-latitude')!.value=String(this.base.latitude);
+        document.querySelector<HTMLInputElement>('#pin-longitude')!.value=String(this.base.longitude);
+      }
+    }
     this.draft={name:name.value,latitude:document.querySelector<HTMLInputElement>('#pin-latitude')!.value,longitude:document.querySelector<HTMLInputElement>('#pin-longitude')!.value};
   }
   private setPoint(point:MapPoint):void {
     this.captureDraft();this.base=this.chosen()?{...this.chosen()!}:null;
+    if(!this.draftPoint()||Number(this.draft.latitude)!==point.lat||Number(this.draft.longitude)!==point.lng){
+      this.draft.name='';const name=document.querySelector<HTMLInputElement>('#pin-name');if(name)name.value='';
+    }
     this.draft.latitude=String(point.lat);this.draft.longitude=String(point.lng);
     const lat=document.querySelector<HTMLInputElement>('#pin-latitude'),lng=document.querySelector<HTMLInputElement>('#pin-longitude');if(lat&&lng){lat.value=this.draft.latitude;lng.value=this.draft.longitude;}
     this.paint();
@@ -151,11 +162,15 @@ export class PinsUI {
     this.captureDraft();
     try{
       if(!this.draftPoint())throw new Error('場所が未選択です。地図をタップするか「現在位置を設定」を押してください。');
-      const fields=pinFields(this.draft.name.trim()||this.base?.name||'集合地点',this.draft.latitude,this.draft.longitude);
+      const samePosition=this.base&&Number(this.draft.latitude)===this.base.latitude&&Number(this.draft.longitude)===this.base.longitude;
+      const fields=pinFields(this.draft.name.trim()||(samePosition?this.base!.name:'集合地点'),this.draft.latitude,this.draft.longitude);
       // 新規ピンのIDをルームIDに固定し、同時登録でも別の2地点を作らない。
       const change:PinChange={action:this.base?'update':'create',requestId:crypto.randomUUID(),pinId:this.base?.id??this.session.membership.roomId,version:this.base?.version,...fields};
       try{localStorage.setItem(this.pendingKey(),JSON.stringify(change));}catch{throw new Error('操作を保存できません。ブラウザーの保存を許可してから再試行してください。');}
-      this.pending=change;await this.save();
+      this.pending=change;
+      // iPhoneの許可要求は通信を待たず、登録のタップ操作内で開始する。
+      void this.compass.ensureStarted();
+      await this.save();
     }catch(error){this.message=(error as Error).message;this.paint();document.querySelector<HTMLElement>('#pin-form-status')?.focus();}
   }
   private async save():Promise<void>{
@@ -193,7 +208,7 @@ export class PinsUI {
       if(!own)markup=title+'<p class="notice">自分の新しい位置が必要です。位置公開をONにしてください。</p>';
       else if(performance.now()-this.received>=30000)markup=title+'<p class="notice">集合地点の更新が止まっています。接続が戻るまで案内を隠します。</p>';
       else{const d=directionTo(own,pin),angle=heading!==null&&d.bearing!==null?degrees(d.bearing-heading):null;
-        markup=`<div class="pin-destination">${title}<p class="friend-distance">${distanceLabel(d.distance)}</p>${angle===null?'':`<div class="pin-direction" role="img" aria-label="${html(pin.name)}の方向：画面の上から時計回りに約${Math.round(angle)%360}度"><span style="transform:rotate(${angle.toFixed(2)}deg)">↑</span></div>`}<p class="hint">${d.bearing===null?'すぐ近くか、方角を確定できない地点です。':angle===null?'コンパスの方角を待っています。距離のみ表示します。':'位置や方角には誤差があります。'}</p></div>`;}
+        markup=`<div class="pin-destination">${title}<p class="friend-distance">${distanceLabel(d.distance)}</p>${angle===null?'':`<div class="pin-direction" role="img" aria-label="${html(pin.name)}の方向：画面の上から時計回りに約${Math.round(angle)%360}度"><span style="transform:rotate(${angle.toFixed(2)}deg)">↑</span></div>`}<p class="hint">${d.bearing===null?'すぐ近くか、方角を確定できない地点です。':angle===null?compassLoading:'位置や方角には誤差があります。'}</p></div>`;}
     }
     const guide=document.querySelector('#pin-guidance')!;if(guide.innerHTML!==markup)guide.innerHTML=markup;
   }

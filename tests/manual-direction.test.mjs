@@ -74,3 +74,35 @@ test('遅い許可応答で手動設定を解除せず、画面回転・再表�
     assert.equal(p.compass.heading(),null);Object.defineProperty(p.w.document,'hidden',{value:false});p.w.document.dispatchEvent(new p.w.Event('visibilitychange'));assert.equal(p.compass.heading(),null);
   }finally{p.w.close();}
 });
+
+test('ピンモードの開始ボタンで許可を要求し、最初の方角通知で矢印を表示する',async()=>{
+  const p=page();try{
+    await p.mode('pins');assert.equal(p.w.document.querySelector('.pin-direction'),null);
+    assert.match(p.w.document.querySelector('#pin-guidance').textContent,/コンパス読み込み中\.\.\./);
+    const spinner=p.w.document.querySelector('#pin-guidance .loading-spinner');assert.ok(spinner);
+    p.advance(250);assert.equal(p.w.document.querySelector('#pin-guidance .loading-spinner'),spinner);
+    p.click('pin-compass');assert.equal(p.calls(),1);await tick();
+    p.sensor();assert.ok(p.w.document.querySelector('.pin-direction'));
+    assert.equal(p.w.document.querySelector('#pin-guidance .loading-spinner'),null);
+    assert.match(p.w.document.querySelector('.pin-direction span').style.transform,/270/);
+    p.click('pin-compass');await tick();assert.equal(p.calls(),2);assert.equal(p.compass.heading(),null);
+    p.sensor();assert.ok(p.w.document.querySelector('.pin-direction'));
+    p.advance(5000);assert.ok(p.w.document.querySelector('#pin-guidance .loading-spinner'));
+    p.source.self=null;p.advance(0);assert.equal(p.w.document.querySelector('#pin-guidance .loading-spinner'),null);
+  }finally{p.w.close();}
+});
+
+test('ピン登録は通信を待たずにコンパスを開始し、方角が来なければ再試行を案内する',async()=>{
+  const p=page();try{
+    await p.mode('pins');let release;
+    p.w.fetch=()=>new Promise(r=>{release=r;});
+    const name=p.w.document.querySelector('#pin-name');name.value='新しい名前';name.dispatchEvent(new p.w.Event('input'));
+    p.click('pin-save');assert.equal(p.calls(),1);assert.ok(release);
+    await tick();p.sensor();assert.ok(p.w.document.querySelector('.pin-direction'));
+    await p.compass.ensureStarted();assert.equal(p.calls(),1);assert.equal(p.compass.heading(),180);
+    p.compass.useManual();p.compass.setManual(90);await p.compass.ensureStarted();
+    assert.equal(p.calls(),1);assert.equal(p.compass.heading(),90);
+    await p.compass.start();p.advance(8000);assert.match(p.compass.status(),/取得できていません/);
+    assert.match(p.w.document.querySelector('#pin-compass-status').textContent,/再試行/);
+  }finally{p.w.close();}
+});

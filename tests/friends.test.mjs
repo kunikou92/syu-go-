@@ -56,7 +56,10 @@ test('許可は操作時だけ求め、友達の名前・距離・相対矢印�
   const p=page();try{
     assert.equal(p.calls(),0);assert.match(p.w.document.querySelector('#friends-list').textContent,/東の友達/);
     assert.equal(p.w.document.querySelectorAll('.friend-row-arrow').length,0);
+    const spinner=p.w.document.querySelector('#friends-status .loading-spinner');assert.ok(spinner);
+    p.advance(250);assert.equal(p.w.document.querySelector('#friends-status .loading-spinner'),spinner);
     p.w.document.querySelector('#compass-start').click();await settle();assert.equal(p.calls(),1);p.sensor(0);
+    assert.equal(p.w.document.querySelector('#friends-status .loading-spinner'),null);
     assert.match(p.w.document.querySelector('.friend-row-arrow').style.transform,/90/);
     p.sensor(270);assert.match(p.w.document.querySelector('.friend-row-arrow').style.transform,/0/);
     const moved=data();moved.members[1].location=loc(.001,0);p.set(moved);
@@ -64,6 +67,8 @@ test('許可は操作時だけ求め、友達の名前・距離・相対矢印�
     const relative=new p.w.Event('deviceorientation');Object.assign(relative,{alpha:0,beta:0,gamma:0,absolute:false});p.w.dispatchEvent(relative);
     assert.equal(p.w.document.querySelectorAll('.friend-row-arrow').length,1);
     p.advance(5000);assert.equal(p.w.document.querySelectorAll('.friend-row-arrow').length,0);
+    assert.ok(p.w.document.querySelector('#friends-status .loading-spinner'));
+    p.set({...data(),self:null});assert.equal(p.w.document.querySelector('#friends-status .loading-spinner'),null);
   }finally{p.w.close();}
 });
 test('自分・他室・非公開・古い位置を除外し、OFFや退出・更新再開に追従',async()=>{

@@ -18,6 +18,7 @@ h1 { font-size: clamp(28px, 7vw, 38px); line-height: 1.5; letter-spacing: -.05em
 .pin-map-card { padding: 16px; }
 .pin-create-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .pin-create-actions .button { justify-content: center; padding: 12px 6px; font-size: 13px; }
+#pin-name::placeholder { color: #778078; font-size: 12px; opacity: 1; }
 h2 { font-size: 17px; margin: 0 0 12px; }
 p { margin: 12px 0; }
 .lead { font-size: 14px; color: #58685f; line-height: 1.9; }
@@ -76,6 +77,11 @@ footer a { display: inline-block; padding: 12px 0; text-decoration: underline; }
 #heading-angle { padding: 8px 0; accent-color: #294f3e; }
 #heading-value { display: inline-block; margin-left: 8px; font-size: 20px; }
 .mode-switch .button { flex: 1; justify-content: center; padding: 12px 8px; }
+.button.secondary.compass-refresh { display: flex; width: fit-content; min-height: 36px; margin: 12px auto; padding: 6px 16px; font-size: 12px; justify-content: center; }
+.compass-loading { display: inline-flex; align-items: center; gap: 8px; }
+.loading-spinner { display: inline-block; width: 17px; height: 17px; flex: 0 0 auto; border: 2px solid #ced7cb; border-top-color: #294f3e; border-radius: 50%; animation: compass-loading-spin 1s linear infinite; }
+@keyframes compass-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
 .mode-switch [aria-pressed="true"] { background: #294f3e; color: #fff; }
 select { width: 100%; min-height: 48px; margin: 10px 0; border: 1px solid #acbdac; border-radius: 10px; padding: 10px; background: #fff; color: inherit; font: inherit; }
 select:focus-visible { outline: 3px solid #b47b23; outline-offset: 3px; }
