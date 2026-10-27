@@ -31,7 +31,20 @@ const views = {
   '/': {
     label: 'HOME',
     title: '',
-    body: '<p class="lead home-description">友達や集合場所の方向と距離を確かめながら、みんなで合流するためのアプリです。ルームを作って招待URLを共有すれば、一緒に使えます。</p><a class="button home-create" href="#/create">ルームを作る <span aria-hidden="true">→</span></a>',
+    body: `<p class="lead home-description">友達や集合場所の方向と距離を確かめながら、みんなで合流するためのアプリです。ルームを作って招待URLを共有すれば、一緒に使えます。</p>
+      <section class="home-modes" aria-label="2つの案内モード">
+        <article class="home-mode-card">
+          <h2>①友達モード</h2>
+          <figure><img src="/images/friends-compass.png" width="320" height="410" alt="友達のいる方向を丸いコンパスと矢印で示し、距離を表示する画面"><figcaption>コンパスの表示イメージ</figcaption></figure>
+          <p>友達がいる方向と距離を確認。矢印を頼りに、お互いの場所へ合流できます。</p>
+        </article>
+        <article class="home-mode-card">
+          <h2>②ピンモード</h2>
+          <figure><img src="/images/pin-compass.png" width="320" height="410" alt="集合地点までの距離と、向かう方向の矢印を表示する画面"><figcaption>コンパスの表示イメージ</figcaption></figure>
+          <p>地図で集合地点を決めて共有。ピンの方向と距離を矢印で確認しながら向かえます。</p>
+        </article>
+      </section>
+      <a class="button home-create" href="#/create">ルームを作る <span aria-hidden="true">→</span></a>`,
   },
   '/create': {
     label: 'CREATE ROOM',
