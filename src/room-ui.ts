@@ -57,7 +57,7 @@ export class RoomUI {
   }
 
   joinContent(): string {
-    if (!this.config) return '<p class="notice">接続先の準備中です。</p>';
+    if (!this.config) return '<p class="notice">現在ルームに接続できません。時間をおいて再度お試しください。</p>';
     const invitation = parseInvitation(window.location.hash);
     if (!invitation) return '<p class="notice">友達から届いた招待URLを開いてください。URLにはルームIDと招待情報が必要です。</p>';
     this.invitation = invitation;

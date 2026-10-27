@@ -55,7 +55,7 @@ const views = {
         <label for="nickname">このルームで使うニックネーム</label>
         <input id="nickname" name="nickname" type="text" autocomplete="nickname" required aria-describedby="nickname-help create-status">
         <p id="nickname-help" class="hint">1〜20文字で入力してください。位置公開はOFFで始まります。</p>
-        ${!config ? '<p class="notice">ルーム作成の準備中です。接続先を設定すると利用できます。</p>' : ''}
+        ${!config ? '<p class="notice">現在ルームを作成できません。時間をおいて再度お試しください。</p>' : ''}
         <button class="button" type="submit" ${!config || creating ? 'disabled' : ''}>${creating ? '作成しています…' : 'ルームを作る'} <span aria-hidden="true">→</span></button>
         <p id="create-status" role="status" aria-live="polite"></p>
       </form>
@@ -64,9 +64,7 @@ const views = {
   '/join': {
     label: 'JOIN ROOM',
     title: '友達の待つ<br>ルームへ。',
-    body: `<p class="lead">友達から届いた招待URLで、ルームに参加します。</p>
-      <section class="card"><h2>ルーム参加</h2><p>招待URLの確認とニックネームの設定は、これから追加します。</p><p class="hint">この画面から実際のルームにはまだ参加できません。</p></section>
-      <a class="button secondary" href="#/guide">案内画面のひな形を見る <span>→</span></a>`,
+    body: '',
   },
   '/guide': {
     label: 'GUIDANCE',
@@ -90,9 +88,9 @@ function render() {
     <div class="mode-switch" role="group" aria-label="案内モード"><button id="mode-friends" class="button secondary" type="button" aria-pressed="${mode==='friends'}">合流モード</button><button id="mode-pins" class="button secondary" type="button" aria-pressed="${mode==='pin'}">ピンモード</button></div>
     ${mode==='friends'?friendsUI.content(compassUI.content()):pinsUI.content(compassUI.content())}${participantsUI.content()}${roomUI.guideContent()}`;
   const simple = path === '/' || path === '/created';
-  app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー</a>${simple?'':'<span class="badge">開発中</span>'}</header>
+  app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー</a></header>
     <main id="main" tabindex="-1">${content}</main>
-    ${simple?'':`<footer><p>開発中です。方向と距離は目安としてお使いください。</p><a href="#/">← ホームに戻る</a></footer>`}</div>`;
+    ${simple?'':`<footer><p>方向と距離は目安としてお使いください。</p><a href="#/">← ホームに戻る</a></footer>`}</div>`;
   document.title = `${path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
   document.querySelector<HTMLFormElement>('#create-form')?.addEventListener('submit', handleCreate);
   document.querySelector<HTMLButtonElement>('#copy-invite')?.addEventListener('click', copyInvitation);
