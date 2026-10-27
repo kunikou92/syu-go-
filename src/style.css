@@ -97,7 +97,7 @@ select:focus-visible { outline: 3px solid #b47b23; outline-offset: 3px; }
 #pin-form-status:focus { outline: 3px solid #b47b23; outline-offset: 3px; }
 .pin-map-canvas { width: 100%; height: 340px; border-radius: 14px; background: #e6ecdf; }
 #pin-map-slot { margin: 16px 0; }
-#pin-map-slot[hidden], #pin-map-reload[hidden] { display: none; }
+#pin-map-slot[hidden], #pin-map-reload[hidden], #pin-map-open[hidden] { display: none; }
 .map-settings, .coordinate-details { margin: 18px 0; padding: 12px; border: 1px solid #d5dccf; border-radius: 12px; }
 summary { cursor: pointer; font-weight: bold; }
 .text-link { text-decoration: underline; display: inline-block; padding: 8px 0; }

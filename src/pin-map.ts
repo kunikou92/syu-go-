@@ -22,7 +22,7 @@ export class PinMap {
   private mapListener: MapListener | null = null;
   constructor(private picked: (point: MapPoint, scope: string) => void,
     private selected: (id: string, scope: string) => void, private changed: () => void,
-    private loader: (key: string) => Promise<MapsSDK> = loadGoogleMaps) {
+    private loader: (key: string) => Promise<MapsSDK> = loadGoogleMaps, private mapId = '') {
     this.host.className = 'pin-map-canvas'; this.host.setAttribute('aria-label','集合地点を選ぶGoogleマップ');
     window.addEventListener(MAP_ERROR_EVENT,(event) => {
       if (!this.map && !this.loading) return;
@@ -54,6 +54,7 @@ export class PinMap {
     event.stop?.(); this.picked(point,this.state.scope);
   }
   async open(key: string): Promise<void> {
+    if (!this.mapId || this.mapId === 'DEMO_MAP_ID') {this.error='地図はただいま準備中です。';this.changed();return;}
     if (this.loading) return;
     if(this.map && this.error){this.error='地図を再開するには画面を再読み込みしてください。';this.changed();return;}
     if (this.map && key === this.key && !this.error) {this.loaded = true;this.changed();return;}
@@ -64,7 +65,7 @@ export class PinMap {
         this.sdk = sdk;this.key = key;
         const pin=this.state.pins.find(p=>p.id===this.state.selected);
         const center=this.center ?? this.state.draft ?? (pin?{lat:pin.latitude,lng:pin.longitude}:{lat:35.681236,lng:139.767125});
-        this.map = new sdk.Map(this.host,{center,zoom:15,mapId:'DEMO_MAP_ID',mapTypeControl:false,streetViewControl:false,
+        this.map = new sdk.Map(this.host,{center,zoom:15,mapId:this.mapId,mapTypeControl:false,streetViewControl:false,
           fullscreenControl:true,gestureHandling:'cooperative',clickableIcons:false,keyboardShortcuts:true});
         if(this.center)this.focused=JSON.stringify([this.state.scope,this.state.draft??(pin?{lat:pin.latitude,lng:pin.longitude}:null)]);
         this.mapListener = this.map.addListener('click',event => this.point(event));

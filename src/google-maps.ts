@@ -18,15 +18,19 @@ export interface MapsSDK {
 type MapWindow = Window & {
   google?: { maps?: MapsSDK }; syuGoMapsReady?: () => void; gm_authFailure?: () => void;
 };
-export const DEMO_KEY_STORAGE = 'syu-go:google-maps-demo-key';
 export const MAP_ERROR_EVENT = 'syu-go-google-map-error';
-export function demoKey(value: string): string {
+export interface GoogleMapsConfig { apiKey: string; mapId: string }
+export function googleMapsKey(value: string): string {
   const key = value.trim();
-  if (!/^AIza[\w-]{35}$/.test(key)) throw new Error('Googleで取得したDemo Keyをそのまま入力してください。');
+  if (!/^AIza[\w-]{35}$/.test(key)) throw new Error('地図の設定を確認できません。管理者にお問い合わせください。');
   return key;
 }
-export function savedDemoKey(storage: Storage): string {
-  try { const value = storage.getItem(DEMO_KEY_STORAGE); return value ? demoKey(value) : ''; } catch { return ''; }
+export function googleMapsConfig(apiKey?: string, mapId?: string): GoogleMapsConfig | null {
+  try {
+    const id = mapId?.trim() ?? '';
+    if (!/^[\w-]{1,128}$/.test(id) || id === 'DEMO_MAP_ID') return null;
+    return { apiKey: googleMapsKey(apiKey ?? ''), mapId: id };
+  } catch { return null; }
 }
 export function validPoint(point: MapPoint): boolean {
   return Number.isFinite(point.lat) && Math.abs(point.lat) <= 90 && Number.isFinite(point.lng) && Math.abs(point.lng) <= 180;
@@ -35,7 +39,7 @@ let loading: Promise<MapsSDK> | null = null;
 let loadedKey = '';
 /** SDKは1ページで1回だけ読み込む。キーの変更は再読み込み後に適用する。 */
 export function loadGoogleMaps(key: string): Promise<MapsSDK> {
-  key = demoKey(key);
+  key = googleMapsKey(key);
   if (loadedKey && loadedKey !== key) return Promise.reject(new Error('地図のキーを変更しました。画面を再読み込みしてください。'));
   if (loading) return loading;
   loadedKey = key;
@@ -52,7 +56,7 @@ export function loadGoogleMaps(key: string): Promise<MapsSDK> {
     const timeout = window.setTimeout(() => finish(new Error('地図の読み込みがタイムアウトしました。接続を確認して再試行してください。')),20000);
     w.syuGoMapsReady = () => finish();
     w.gm_authFailure = () => {
-      const message = '地図を利用できません。Demo Keyの設定・利用上限を確認してください。上限到達時は翌日まで待ってください。';
+      const message = '地図を利用できません。利用上限に達したか、地図の設定に問題がある可能性があります。時間をおいて再度お試しください。';
       window.dispatchEvent(new CustomEvent(MAP_ERROR_EVENT,{detail:message})); finish(new Error(message));
     };
     script.async = true;

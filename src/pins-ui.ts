@@ -9,8 +9,8 @@ import { Compass } from './compass';
 import { compassLoading } from './compass-ui';
 import { degrees, directionTo, distanceLabel } from './friends';
 import { PinMap } from './pin-map';
-import { demoKey, savedDemoKey, DEMO_KEY_STORAGE, validPoint } from './google-maps';
-import type { MapPoint, MapsSDK } from './google-maps';
+import { validPoint } from './google-maps';
+import type { MapPoint, MapsSDK, GoogleMapsConfig } from './google-maps';
 
 const html=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]!);
 const key=(s:Session|null)=>s?`${s.membership.roomId}:${s.membership.participantId}`:'';
@@ -23,12 +23,12 @@ export class PinsUI {
   private pending:PinChange|null=null; private message=''; private connectionError=false;
   private draft={name:'',latitude:'',longitude:''};
   private base:SharedPin|null=null; private hasDraft=false;
-  private compass:Compass; private mapPicker:PinMap; private mapSetupMessage='';
+  private compass:Compass; private mapPicker:PinMap;
   private locating=false; private geoAttempt=0; private viewGeneration=0; private autoScope=''; private locationMessage='';
   constructor(private config:BackendConfig|null,private source:()=>FriendSource|null,private redraw:()=>void,
-    compass?:Compass,private onTerminal?:(status:RoomStatus)=>void,mapLoader?:(key:string)=>Promise<MapsSDK>){
+    compass?:Compass,private onTerminal?:(status:RoomStatus)=>void,mapLoader?:(key:string)=>Promise<MapsSDK>,private mapsConfig:GoogleMapsConfig|null=null){
     this.compass=compass??new Compass(()=>this.paint());
-    this.mapPicker=new PinMap((point,scope)=>{if(scope!==key(this.current())||this.saving||this.pending)return;this.setPoint(point);},()=>{},()=>this.paint(),mapLoader);
+    this.mapPicker=new PinMap((point,scope)=>{if(scope!==key(this.current())||this.saving||this.pending)return;this.setPoint(point);},()=>{},()=>this.paint(),mapLoader,this.mapsConfig?.mapId);
     window.setInterval(()=>void this.sync(),5000);
     window.setInterval(()=>{this.scopeCheck();this.paint();},250);
     window.addEventListener('online',()=>void this.sync());
@@ -55,6 +55,7 @@ export class PinsUI {
         <label for="pin-name">ピンの名前(任意)</label><input id="pin-name" value="${html(this.draft.name)}" placeholder="入力したら更新ボタンを押してください" aria-describedby="pin-form-status">
         <div class="pin-create-actions"><button id="pin-use-location" class="button secondary" type="button">現在位置を設定</button><button id="pin-save" class="button" type="submit">集合地点を追加</button></div>
         <p id="pin-map-status" class="hint" role="status"></p><p id="pin-location-status" class="hint" role="status"></p>
+        <button id="pin-map-open" class="button secondary" type="button" hidden>地図を再試行</button>
         <button id="pin-map-reload" class="button secondary" type="button" hidden>画面を再読み込みする</button>
         <input id="pin-latitude" type="hidden" value="${html(this.draft.latitude)}"><input id="pin-longitude" type="hidden" value="${html(this.draft.longitude)}">
         <p id="pin-picked-position" class="hint" role="status"></p><p id="pin-form-status" class="notice" role="status" tabindex="-1"></p>
@@ -64,19 +65,12 @@ export class PinsUI {
       <div id="pin-guidance" aria-live="off"></div>
       <button id="pin-compass" class="button secondary compass-refresh" type="button">コンパス更新</button><p id="pin-compass-status" class="hint" role="status"></p>
       ${headingControls}
-      <details class="map-settings" ${savedDemoKey(localStorage)?'':'open'}><summary>確認用の地図設定</summary>
-        <p class="hint">GoogleのDemo Keyをこのブラウザーに設定してください。</p><a class="text-link" href="https://developers.google.com/maps/demo-key" target="_blank" rel="noopener noreferrer">Google公式ページでDemo Keyを取得 ↗</a>
-        <form id="demo-key-form"><label for="google-demo-key">Demo Key</label><input id="google-demo-key" type="password" autocomplete="off" spellcheck="false" placeholder="${savedDemoKey(localStorage)?'登録済み。変更する場合だけ入力':'取得したDemo Keyを貼り付け'}"><button class="button secondary" type="submit">このブラウザーに保存して地図を開く</button></form>
-        <button id="demo-key-remove" class="button secondary" type="button">保存したキーを消す</button><button id="pin-map-open" class="button secondary" type="button">地図を再試行</button><p id="demo-key-status" class="hint" role="status"></p>
-        <p class="hint">キーはこのブラウザーだけに保存し、地図の読み込み時にGoogleへ送信します。スマホ側にも設定してください。課金設定や有料キーへの切り替えは行いません。</p>
-      </details></section>`;
+      </section>`;
   }
   mount():void {
     this.mapPicker.mount(document.querySelector('#pin-map-slot'));
     document.querySelector('#pin-map-open')?.addEventListener('click',()=>void this.initializeMap());
     document.querySelector('#pin-map-reload')?.addEventListener('click',()=>window.location.reload());
-    document.querySelector('#demo-key-form')?.addEventListener('submit',event=>{event.preventDefault();void this.saveMapKey();});
-    document.querySelector('#demo-key-remove')?.addEventListener('click',()=>{try{localStorage.removeItem(DEMO_KEY_STORAGE);this.mapPicker.clear();this.mapSetupMessage='保存したキーを削除しました。';this.redraw();}catch{this.mapSetupMessage='キーを削除できません。';this.paint();}});
     document.querySelector('#pin-form')?.addEventListener('submit',event=>{event.preventDefault();void this.submit();});
     document.querySelector('#pin-retry')?.addEventListener('click',()=>void this.save());
     document.querySelector('#pin-use-location')?.addEventListener('click',()=>void this.locate(true));
@@ -87,11 +81,11 @@ export class PinsUI {
   }
   private visible():boolean{return !!document.querySelector('#pin-map-slot')&&!!this.session&&key(this.current())===this.scope;}
   private async initializeMap():Promise<void>{
-    const mapKey=savedDemoKey(localStorage);if(!mapKey){this.paint();return;}
+    if(!this.mapsConfig){this.paint();return;}
     const generation=this.generation,viewGeneration=this.viewGeneration;
     if(this.visible())await this.locate(false);
     if(generation!==this.generation||viewGeneration!==this.viewGeneration||!document.querySelector('#pin-map-slot'))return;
-    await this.mapPicker.open(mapKey);
+    await this.mapPicker.open(this.mapsConfig.apiKey);
   }
   private async locate(setPin:boolean):Promise<void>{
     if(!this.visible()||this.locating)return;
@@ -117,12 +111,6 @@ export class PinsUI {
       this.locationMessage=setPin?'現在位置に仮ピンを置きました。追加・更新ボタンで登録してください。':'';
     }catch(error){if(valid())this.locationMessage=(error as Error).message;}
     finally{if(attempt===this.geoAttempt){this.locating=false;this.paint();}}
-  }
-  private async saveMapKey():Promise<void>{
-    const input=document.querySelector<HTMLInputElement>('#google-demo-key');if(!input)return;
-    try{const value=demoKey(input.value),previous=savedDemoKey(localStorage);localStorage.setItem(DEMO_KEY_STORAGE,value);input.value='';this.mapSetupMessage='Demo Keyを保存しました。';
-      if(previous&&previous!==value){this.mapPicker.clear();this.mapSetupMessage='キーを変更しました。画面を再読み込みしてください。';this.paint();return;}await this.initializeMap();
-    }catch(error){this.mapSetupMessage=error instanceof Error?error.message:'キーを保存できません。';this.paint();}
   }
   private draftPoint():MapPoint|null {const p={lat:Number(this.draft.latitude),lng:Number(this.draft.longitude)};return this.draft.latitude.trim()&&this.draft.longitude.trim()&&validPoint(p)?p:null;}
   private captureDraft():void {
@@ -192,13 +180,12 @@ export class PinsUI {
     const use=document.querySelector<HTMLButtonElement>('#pin-use-location')!;use.disabled=disabled||this.locating;
     document.querySelectorAll<HTMLInputElement>('#pin-form input').forEach(input=>input.disabled=disabled);
     const retry=document.querySelector<HTMLButtonElement>('#pin-retry')!;retry.hidden=!this.pending;retry.disabled=this.saving;
-    const mapKey=savedDemoKey(localStorage);text(document.querySelector('#demo-key-status')!,this.mapSetupMessage||(mapKey?'Demo Keyを設定済みです。':'Demo Keyは未設定です。'));
-    text(document.querySelector('#pin-map-status')!,mapKey?this.mapPicker.message():'「確認用の地図設定」でDemo Keyを設定してください。');
+    text(document.querySelector('#pin-map-status')!,this.mapsConfig?this.mapPicker.message():'地図はただいま準備中です。');
     text(document.querySelector('#pin-location-status')!,this.locationMessage);
-    (document.querySelector('#pin-map-open') as HTMLButtonElement).disabled=!mapKey||this.mapPicker.busy()||this.locating;
-    (document.querySelector('#pin-map-reload') as HTMLElement).hidden=!this.mapPicker.message().includes('再読み込み')&&!this.mapSetupMessage.includes('再読み込み');
-    (document.querySelector('#pin-map-slot') as HTMLElement).hidden=!mapKey;
-    const draft=this.draftPoint();text(document.querySelector('#pin-picked-position')!,draft?'仮ピンを選択中です。追加・更新ボタンで登録してください。':'地図をタップすると仮ピンを置けます。');
+    (document.querySelector('#pin-map-open') as HTMLButtonElement).hidden=!this.mapsConfig||this.mapPicker.available()||this.mapPicker.busy()||this.locating;
+    (document.querySelector('#pin-map-reload') as HTMLElement).hidden=!this.mapsConfig||!this.mapPicker.message().includes('再読み込み');
+    (document.querySelector('#pin-map-slot') as HTMLElement).hidden=!this.mapsConfig;
+    const draft=this.draftPoint();text(document.querySelector('#pin-picked-position')!,draft?'仮ピンを選択中です。追加・更新ボタンで登録してください。':this.mapsConfig?'地図をタップすると仮ピンを置けます。':'「現在位置を設定」で今いる場所を指定できます。');
     this.mapPicker.update({scope:this.scope,pins:pin&&!draft?[pin]:[],selected:pin?.id??null,draft,enabled:!disabled});
     text(document.querySelector('#pin-compass-status')!,this.compass.status());(document.querySelector('#pin-compass') as HTMLButtonElement).disabled=this.compass.busy();
     const source=this.source(),heading=this.compass.heading();

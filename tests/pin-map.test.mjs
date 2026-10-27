@@ -2,7 +2,7 @@ import {before,test} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {build} from 'vite';
-import {demoKey,savedDemoKey,DEMO_KEY_STORAGE} from '../src/google-maps.ts';
+import {googleMapsKey,googleMapsConfig} from '../src/google-maps.ts';
 let bundle;
 before(async()=>{
   const result=await build({configFile:false,logLevel:'silent',build:{write:false,lib:{entry:'src/pin-map.ts',formats:['iife'],name:'MapTest'}}});
@@ -14,9 +14,9 @@ function sdk(){
   class Marker{constructor(options){Object.assign(this,options);this.events={};markers.push(this);}addListener(name,fn){this.events[name]=fn;return{remove:()=>delete this.events[name]};}append(node){this.node=node;}}
   return{api:{Map:MapView,marker:{AdvancedMarkerElement:Marker},event:{trigger(){},clearInstanceListeners(instance){instance.events={};}}},views,markers};
 }
-function page(loader){
+function page(loader,mapId='configured-map'){
   const dom=new JSDOM('<div id="map"></div>',{url:'https://app.example',runScripts:'outside-only'});dom.window.eval(bundle);const picked=[],selected=[];
-  const picker=new dom.window.MapTest.PinMap((p,s)=>picked.push({p,s}),(id,s)=>selected.push({id,s}),()=>{},loader);
+  const picker=new dom.window.MapTest.PinMap((p,s)=>picked.push({p,s}),(id,s)=>selected.push({id,s}),()=>{},loader,mapId);
   picker.mount(dom.window.document.querySelector('#map'));
   return{dom,picker,picked,selected};
 }
@@ -53,7 +53,7 @@ test('接続失敗は再試行でき、認証・上限のエラーは地図を�
   const fake=sdk();let tries=0;const p=page(async()=>{if(++tries===1)throw new Error('接続できません');return fake.api;});try{
     await p.picker.open('test-key');assert.equal(p.picker.available(),false);assert.match(p.picker.message(),/接続できません/);
     await p.picker.open('test-key');assert.equal(p.picker.available(),true);
-    p.dom.window.dispatchEvent(new p.dom.window.CustomEvent('syu-go-google-map-error',{detail:'Demo Keyの設定・利用上限を確認してください。'}));
+    p.dom.window.dispatchEvent(new p.dom.window.CustomEvent('syu-go-google-map-error',{detail:'地図の設定・利用上限を確認してください。'}));
     assert.equal(p.picker.available(),false);assert.match(p.picker.message(),/利用上限/);
     await p.picker.open('test-key');assert.match(p.picker.message(),/再読み込み/);
   }finally{p.dom.window.close();}
@@ -67,11 +67,11 @@ test('現在地中心の初期表示を既存の集合地点で上書きせず�
   p.picker.update({...state(),draft:{lat:36,lng:140}});assert.equal(fake.views[0].pans.at(-1).lat,36);
  }finally{p.dom.window.close();}
 });
-test('Demo Keyの形式と保存を検査し、SDKの読み込みを1回にまとめてキー変更を拒否する',async()=>{
-  const key='AIza'+'b'.repeat(35);assert.equal(demoKey(' '+key+' '),key);assert.throws(()=>demoKey(key+'&callback=bad'));
-  assert.equal(savedDemoKey({getItem(){throw new Error('blocked');}}),'');
+test('公開側のキーとMap IDを検査し、SDKの読み込みを1回にまとめてキー変更を拒否する',async()=>{
+  const key='AIza'+'b'.repeat(35);assert.equal(googleMapsKey(' '+key+' '),key);assert.throws(()=>googleMapsKey(key+'&callback=bad'));
+  assert.deepEqual(googleMapsConfig(key,'configured-map'),{apiKey:key,mapId:'configured-map'});
+  for(const args of [[undefined,undefined],[key,''],['bad','configured-map'],[key,'DEMO_MAP_ID'],[key,'id&callback=bad']])assert.equal(googleMapsConfig(...args),null);
   const dom=new JSDOM('',{url:'https://app.example',runScripts:'outside-only'}),w=dom.window;
-  w.localStorage.setItem(DEMO_KEY_STORAGE,key);assert.equal(savedDemoKey(w.localStorage),key);
   const prior={window:globalThis.window,document:globalThis.document,CustomEvent:globalThis.CustomEvent};
   globalThis.window=w;globalThis.document=w.document;globalThis.CustomEvent=w.CustomEvent;
   try{
@@ -84,4 +84,10 @@ test('Demo Keyの形式と保存を検査し、SDKの読み込みを1回にま�
     assert.equal(await loadGoogleMaps(key),fake.api);assert.equal(w.document.querySelectorAll('script').length,1);
     await assert.rejects(loadGoogleMaps('AIza'+'c'.repeat(35)),/再読み込み/);
   }finally{globalThis.window=prior.window;globalThis.document=prior.document;globalThis.CustomEvent=prior.CustomEvent;w.close();}
+});
+
+test('本番用Map IDがない場合はGoogleのSDKも地図も読み込まない',async()=>{
+ let calls=0;const p=page(async()=>{calls++;return sdk().api;},'');try{
+  await p.picker.open('test-key');assert.equal(calls,0);assert.equal(p.picker.available(),false);assert.match(p.picker.message(),/準備中/);
+ }finally{p.dom.window.close();}
 });

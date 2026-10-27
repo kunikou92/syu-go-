@@ -9,8 +9,10 @@ import { FriendsUI } from './friends-ui';
 import { PinsUI } from './pins-ui';
 import { Compass } from './compass';
 import { CompassUI } from './compass-ui';
+import { googleMapsConfig } from './google-maps';
 
 const config = backendConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const mapsConfig = googleMapsConfig(import.meta.env.VITE_GOOGLE_MAPS_API_KEY, import.meta.env.VITE_GOOGLE_MAPS_MAP_ID);
 let creating = false;
 const roomUI = new RoomUI(config, () => render());
 const participantsUI = new ParticipantsUI(config, () => render(), (status) => roomUI.notifyTerminal(status));
@@ -18,7 +20,7 @@ const locationUI = new LocationUI(config);
 const compass = new Compass(() => {friendsUI.paint();pinsUI.paint();compassUI.paint();});
 const compassUI = new CompassUI(compass);
 const friendsUI = new FriendsUI(() => locationUI.guidance(),compass);
-const pinsUI = new PinsUI(config,() => locationUI.guidance(),() => render(),compass,status => roomUI.notifyTerminal(status));
+const pinsUI = new PinsUI(config,() => locationUI.guidance(),() => render(),compass,status => roomUI.notifyTerminal(status),undefined,mapsConfig);
 let mode: 'friends' | 'pin' = 'friends';
 let modeScope = '';
 

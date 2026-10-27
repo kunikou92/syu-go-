@@ -84,12 +84,12 @@ function page(s,request=backend,mapLoader,options={}){
   const dom=new JSDOM('<div id="app"></div>',{url:'https://app.example/#/guide',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
   w.AbortSignal=AbortSignal;w.fetch=request;let elapsed=100;Object.defineProperty(w.performance,'now',{value:()=>elapsed});Object.defineProperty(w,'isSecureContext',{value:true});
   if(options.geo)Object.defineProperty(w.navigator,'geolocation',{value:{getCurrentPosition:options.geo}});
-  if(options.key)w.localStorage.setItem('syu-go:google-maps-demo-key','AIza'+'a'.repeat(35));
+  if(options.legacyKey)w.localStorage.setItem('syu-go:google-maps-demo-key','AIza'+'a'.repeat(35));
   const timers=new Map();w.setInterval=(fn,ms)=>{timers.set(ms,fn);return ms;};
   const store=v=>writeSession(w.localStorage,config.url,v);store(s);w.eval(bundle);
   const source={self:options.noSelf?null:{latitude:35,longitude:139,accuracyMeters:5,updatedAt:new Date().toISOString()},selfId:s.membership.participantId,roomId:s.membership.roomId,members:[],serverTime:Date.now(),elapsed:0};
   const compass={heading:()=>0,status:()=> '方角取得済み',busy:()=>false,start:async()=>{},ensureStarted:async()=>{}},terminal=[];
-  const ui=new w.PinTest.PinsUI(config,()=>source,()=>render(),compass,status=>terminal.push(status),mapLoader);
+  const ui=new w.PinTest.PinsUI(config,()=>source,()=>render(),compass,status=>terminal.push(status),mapLoader,options.key?{apiKey:'AIza'+'a'.repeat(35),mapId:'configured-map'}:null);
   function render(){w.document.querySelector('#app').innerHTML=ui.content();ui.mount();}render();
   const field=(id,v)=>{const e=w.document.querySelector('#'+id);e.value=v;e.dispatchEvent(new w.Event('input',{bubbles:true}));};
   return {w,ui,render,timers,store,source,field,terminal,advance:n=>{elapsed+=n;},button:id=>w.document.querySelector('#'+id)};
@@ -152,7 +152,17 @@ test('保存不可では送信しない。新しい公開位置を使う場合�
 test('キー設定済みなら地図を自動で現在地中心に開き、選択・登録・再描画で地図を再利用する',async()=>{
  const s=await create(),maps=fakeMaps();let loads=0;const p=page(s,backend,async()=>{loads++;return maps.api;},{key:true});try{await until(()=>maps.views.length===1&&!p.button('pin-save').disabled);assert.equal(maps.views[0].options.center.lat,35);assert.equal(loads,1);
  maps.views[0].events.click({latLng:{lat:()=>35.123,lng:()=>139.456}});assert.equal((await call(s)).pins.length,0);submit(p);await until(async()=>(await call(s)).pins.length===1);assert.equal((await call(s)).pins[0].latitude,35.123);
- p.render();assert.equal(maps.views.length,1);assert.equal(loads,1);p.button('demo-key-remove').click();assert.equal(p.w.localStorage.getItem('syu-go:google-maps-demo-key'),null);
+ p.render();assert.equal(maps.views.length,1);assert.equal(loads,1);assert.equal(maps.views[0].options.mapId,'configured-map');
+ }finally{p.w.close();}
+});
+
+test('公開側の地図設定がなければ保存済みの旧キーを使わず、測位・SDK取得を始めない',async()=>{
+ const s=await create();let loads=0,geoCalls=0;
+ const p=page(s,backend,async()=>{loads++;return fakeMaps().api;},{legacyKey:true,noSelf:true,geo:()=>{geoCalls++;}});
+ try{await until(()=>!p.button('pin-save').disabled);assert.equal(loads,0);assert.equal(geoCalls,0);
+  assert.match(p.w.document.querySelector('#pin-map-status').textContent,/準備中/);assert.equal(p.button('pin-map-slot').hidden,true);
+  assert.doesNotMatch(p.w.document.body.textContent,/Demo Key|確認用の地図設定|ブラウザーに保存/);
+  assert.equal(p.button('google-demo-key'),null);assert.equal(p.button('pin-map-open').hidden,true);
  }finally{p.w.close();}
 });
 
