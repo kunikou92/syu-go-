@@ -9,16 +9,16 @@
 - 終了後7日のルームを毎分最大50室ずつ関連情報とともに削除する。作成要求にUUIDv7の時刻を入れ、24時間より古い新規要求を拒否することで、削除後の古い作成要求からの復活を防ぐ。
 - 既存の複数ピンはメインを優先して1つを有効にし、残りは保管状態へ移した。保管行はルーム削除時に削除する。
 - Supabaseの新規テーブル自動公開を無効にし、将来の関数も明示的な権限付与が必要な状態に変更。既存の必要なRPCのみ公開した。
-- CSPのframe-ancestors、X-Frame-Options、nosniff、Referrer-Policy、Permissions-Policy、HSTSを追加。Sitesの静的配信では `_headers` が適用されなかったため、`scripts/build-hosting.mjs` でアセットを内包するWorkerを生成して直接ヘッダーを返す。
+- CSPのframe-ancestors、X-Frame-Options、nosniff、Referrer-Policy、Permissions-Policy、HSTSを追加。当初SitesのWorkerで応答を確認したが、公開先をVercelへ訂正したため、現在は同じ6ヘッダーを `vercel.json` に設定している。Sites専用の生成スクリプトと `_headers` は削除済み。Vercel上の応答確認は公開後に行う。
 
 DBへ適用した履歴は `supabase/migrations/20261102024907_security_bounds_and_retention.sql`。本人限定サイトは同じプロジェクトのまま更新し、公開範囲は拡大していない。配置用ソースのコミットは `99dbceccfd3746fef43e14523057293ca335c862`。
 
-現在のURL: <https://syu-go-mobile.kousei54kuni.chatgpt.site/>。配信サービスから返された正規URLに変わったため、Google Mapsキーの許可先もこのURLへ置き換え、Maps JavaScript APIだけの制限を維持した。旧URLへの応答は307リダイレクトだった。新しいURLは別オリジンのため、ブラウザーの以前の参加情報は引き継がれない。
+当時の確認URL: <https://syu-go-mobile.kousei54kuni.chatgpt.site/>。現在は本人限定の確認用へ戻しており、Vercelの本番URLではない。Google Mapsキーの許可先はこの確認用URLのままなので、Vercelの本番URL確定後に設定する。Maps JavaScript APIだけの制限は維持している。URLが変わると、以前のブラウザーの参加情報は新しいオリジンへ引き継がれない。
 
 ## 確認結果
 
 - 自動テスト101件、TypeScript検査、Viteビルド成功。実際の履歴ファイル名へ移動後にも追加13件を再実行し成功。
-- 生成WorkerのGET/HEAD/404/405、全5アセットのバイト一致を確認。
+- 当時のSites用生成WorkerのGET/HEAD/404/405、全5アセットのバイト一致を確認（過去の検証記録。Vercelの確認とは別）。
 - 新しい配信先の本人限定HTTP応答200で、上記6種類のセキュリティヘッダーを確認。
 - 実DBでRLS、匿名利用者のテーブル直接操作禁止、非公開スキーマへのアクセス禁止、有効ピンの重複なしを確認。
 - 毎分の保守ジョブは成功。実行後は保持2室、終了後7日を超えた未削除ルーム0室。期限を過ぎた旧47室は保守ジョブにより削除された。

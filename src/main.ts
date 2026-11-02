@@ -10,6 +10,7 @@ import { PinsUI } from './pins-ui';
 import { Compass } from './compass';
 import { CompassUI } from './compass-ui';
 import { googleMapsConfig } from './google-maps';
+import { privacyContent } from './privacy';
 
 const config = backendConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const mapsConfig = googleMapsConfig(import.meta.env.VITE_GOOGLE_MAPS_API_KEY, import.meta.env.VITE_GOOGLE_MAPS_MAP_ID);
@@ -83,6 +84,7 @@ function render() {
     : `<p class="eyebrow">NOT FOUND</p><h1>ページが<br>見つかりません。</h1><a class="button" href="#/">ホームに戻る →</a>`;
   if (path === '/') content = views['/'].body;
   if (path === '/created') content = createdContent();
+  if (path === '/privacy') content = privacyContent;
   if (path === '/join') content = `<p class="eyebrow">JOIN ROOM</p><h1 class="join-title">友達の待つルームへ。</h1>${roomUI.joinContent()}`;
   if (path === '/guide') content = `${locationUI.content()}
     <div class="mode-switch" role="group" aria-label="案内モード"><button id="mode-friends" class="button secondary" type="button" aria-pressed="${mode==='friends'}">合流モード</button><button id="mode-pins" class="button secondary" type="button" aria-pressed="${mode==='pin'}">ピンモード</button></div>
@@ -90,8 +92,8 @@ function render() {
   const simple = path === '/' || path === '/created';
   app!.innerHTML = `<div class="shell"><header><a class="brand" href="#/" aria-label="しゅーごー ホーム">しゅーごー</a></header>
     <main id="main" tabindex="-1">${content}</main>
-    ${simple?'':`<footer><p>方向と距離は目安としてお使いください。</p><a href="#/">← ホームに戻る</a></footer>`}</div>`;
-  document.title = `${path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
+    <footer>${simple?'':`<p>方向と距離は目安としてお使いください。</p><a href="#/">← ホームに戻る</a>`}<p><a href="#/privacy">位置情報とデータの扱い</a></p></footer></div>`;
+  document.title = `${path === '/privacy' ? '位置情報とデータの扱い' : path === '/created' ? 'ルーム作成完了' : view?.label === 'HOME' ? 'ホーム' : view?.label === 'CREATE ROOM' ? 'ルーム作成' : view?.label === 'JOIN ROOM' ? 'ルーム参加' : view?.label === 'GUIDANCE' ? '案内' : 'ページが見つかりません'} | しゅーごー（集合！）`;
   document.querySelector<HTMLFormElement>('#create-form')?.addEventListener('submit', handleCreate);
   document.querySelector<HTMLButtonElement>('#copy-invite')?.addEventListener('click', copyInvitation);
   roomUI.mount();

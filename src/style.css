@@ -38,6 +38,9 @@ p { margin: 12px 0; }
 a:focus-visible { outline: 3px solid #b47b23; outline-offset: 4px; }
 main:focus { outline: none; }
 .hint, footer { font-size: 12px; color: #637065; }
+.privacy-content h1 { font-size: clamp(23px, 6vw, 30px); }
+.privacy-content h2 { margin-top: 28px; }
+.privacy-content a { text-decoration: underline; overflow-wrap: anywhere; }
 .card { padding: 24px; border: 1px solid #d5dccf; background: #fffef8; border-radius: 18px; margin: 24px 0; font-size: 14px; }
 dl { margin-bottom: 0; }
 dl div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #e5e8df; padding: 10px 0; }

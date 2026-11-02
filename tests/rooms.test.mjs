@@ -113,6 +113,23 @@ function page(hash, fetcher, storage = {}) {
   return dom;
 }
 const submit = (dom) => dom.window.document.querySelector('form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+
+test('利用者向けのデータ説明へ移動しても、未参加なら測位・外部通信を始めない', async () => {
+  let calls=0;
+  const dom=page('#/',async()=>{calls++;throw Error('Unexpected request');});
+  try {
+    const w=dom.window;
+    Object.defineProperty(w.navigator,'geolocation',{value:{getCurrentPosition(){calls++;}}});
+    const link=w.document.querySelector('footer a[href="#/privacy"]');
+    assert.ok(link); link.click();
+    await until(()=>w.document.querySelector('#privacy-title'));
+    assert.match(w.document.title,/位置情報とデータの扱い/);
+    assert.match(w.document.querySelector('main').textContent,/終了後7日/);
+    assert.match(w.document.querySelector('main').textContent,/通信できない間は削除が完了しません/);
+    assert.equal(w.document.querySelector('script[src*="googleapis"]'),null);
+    assert.equal(calls,0);
+  } finally {dom.window.close();}
+});
 async function until(predicate) {
   for (let i = 0; i < 100; i++) {
     if (predicate()) return;
