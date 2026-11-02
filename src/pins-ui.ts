@@ -136,6 +136,10 @@ export class PinsUI {
   private apply(reply:PinReply):void{if(reply.revision!<this.revision)return;this.pins=reply.pins!;this.mainId=reply.mainPinId!;this.revision=reply.revision!;this.ready=true;this.received=performance.now();}
   private terminal(reply:PinReply):boolean {
     if(['ok','conflict','pin_missing'].includes(reply.status))return false;
+    if(reply.status==='rate_limited'||reply.status==='limit_reached') {
+      this.message=reply.status==='rate_limited'?'集合地点の更新が集中しています。1分ほど待って再試行してください。':'集合地点は1つまで、更新操作は1ルーム300回までです。最新の地点を確認するか、新しいルームを作成してください。';
+      return true;
+    }
     this.message=reply.status==='invalid_request'?'操作を確認できません。入力を確認してください。':statusMessages[reply.status as RoomStatus];
     if(reply.status!=='invalid_request'&&this.session){const status=reply.status as RoomStatus;acceptReply(localStorage,this.config!.url,this.session,{status});this.onTerminal?.(status);this.scopeCheck();this.redraw();}return true;
   }

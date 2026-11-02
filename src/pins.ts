@@ -8,7 +8,7 @@ export interface PinChange {
   name?: string; latitude?: number; longitude?: number; version?: number;
 }
 export interface PinReply {
-  status: RoomStatus | 'conflict' | 'pin_missing'; revision?: number; mainPinId?: string | null; pins?: SharedPin[];
+  status: RoomStatus | 'conflict' | 'pin_missing' | 'rate_limited' | 'limit_reached'; revision?: number; mainPinId?: string | null; pins?: SharedPin[];
 }
 export function pinFields(name: string, latitude: string, longitude: string): { name: string; latitude: number; longitude: number } {
   const clean = name.trim();
@@ -30,7 +30,7 @@ export async function pinAction(config: BackendConfig, session: Session, change:
   });
   if (!response.ok) throw new Error('集合地点を更新できませんでした。');
   const reply = await response.json() as PinReply;
-  if (['unauthorized','missing','ended','membership_expired','invalid_request'].includes(reply.status)) return reply;
+  if (['unauthorized','missing','ended','membership_expired','invalid_request','rate_limited','limit_reached'].includes(reply.status)) return reply;
   if (!['ok','conflict','pin_missing'].includes(reply.status) || !Number.isSafeInteger(reply.revision) || reply.revision! < 0 ||
     !Array.isArray(reply.pins) || new Set(reply.pins.map(p => p.id)).size !== reply.pins.length ||
     (reply.pins.length === 0 ? reply.mainPinId !== null : !reply.pins.some(p => p.id === reply.mainPinId)) ||

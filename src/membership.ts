@@ -3,7 +3,7 @@ import type { BackendConfig, CreatedRoom } from './rooms';
 import { newIntent, normalizeNickname } from './rooms.ts';
 
 export type RoomStatus = 'ok' | 'open' | 'full' | 'missing' | 'ended' | 'invalid_invitation' |
-  'unauthorized' | 'membership_expired' | 'invalid_nickname' | 'invalid_request' | 'left';
+  'unauthorized' | 'membership_expired' | 'membership_limit' | 'invalid_nickname' | 'invalid_request' | 'left';
 export interface RoomReply extends Partial<CreatedRoom> { status: RoomStatus; expiresAt?: string }
 export interface Session {
   membership: LocalMembership;
@@ -20,6 +20,7 @@ export const statusMessages: Record<RoomStatus, string> = {
   invalid_invitation: '招待URLが正しくありません。友達にURLを確認してください。',
   unauthorized: '参加情報を確認できません。招待URLから参加し直してください。',
   membership_expired: '最後の通信から5分が経過したか、すでに退出しています。招待URLから参加し直せます。',
+  membership_limit: 'このルームの累計参加上限に達しました。新しいルームを作成してください。',
   invalid_nickname: 'ニックネームを1〜20文字で入力してください。',
   invalid_request: '操作を確認できません。画面を開き直してください。', left: 'ルームから退出しました。',
 };

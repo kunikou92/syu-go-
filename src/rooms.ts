@@ -41,12 +41,24 @@ export function backendConfig(url: string | undefined, publicKey: string | undef
   } catch { return null; }
 }
 
+/** UUIDv7の時刻をDBでも検査し、保持期限後の古い作成要求を拒否する。 */
+export function newRoomId(now = Date.now()): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let time = BigInt(now);
+  for (let i = 5; i >= 0; i--) { bytes[i] = Number(time & 255n); time >>= 8n; }
+  bytes[6] = (bytes[6] & 15) | 112;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
 export function newIntent(nickname: string): CreationIntent {
+  const startedAt = Date.now();
   return {
-    roomId: crypto.randomUUID(),
+    roomId: newRoomId(startedAt),
     resumeToken: Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
     nickname: normalizeNickname(nickname),
-    startedAt: Date.now(),
+    startedAt,
   };
 }
 
@@ -66,9 +78,11 @@ export async function createRoom(config: BackendConfig, intent: CreationIntent, 
     throw new Error('ルームを作成できませんでした。接続設定を確認するか、時間をおいて再試行してください。');
   }
   const result = await response.json() as CreatedRoom & { status?: string };
-  if (result.status === 'ended' || result.status === 'membership_expired') {
-    throw new CreationExpiredError('前回の参加は終了しています。もう一度ボタンを押すと、新しいルームを作成します。');
+  if (result.status === 'ended' || result.status === 'membership_expired' || result.status === 'creation_expired') {
+    throw new CreationExpiredError('作成操作または前回の参加の有効期限が切れました。端末の日時を確認し、もう一度ボタンを押してください。');
   }
+  if (result.status === 'rate_limited') throw new Error('ルーム作成が混み合っています。1分ほど待ってから再試行してください。');
+  if (result.status === 'capacity_reached') throw new Error('ルーム作成の利用上限に達しています。時間をおいて再試行してください。');
   if (result.room?.id !== intent.roomId || result.participant?.roomId !== intent.roomId ||
       result.invitation?.roomId !== intent.roomId || !/^[a-f0-9]{64}$/.test(result.invitation?.token ?? '') ||
       !result.participant?.id || !Number.isFinite(Date.parse(result.room.expiresAt))) {
